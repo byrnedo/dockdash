@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/byrnedo/dockdash/dockerClient"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
@@ -9,11 +10,27 @@ import (
 )
 
 func createExitBar() (p *ui.Par) {
-	p = ui.NewPar(":PRESS q TO QUIT DEMO")
+	p = ui.NewPar(":PRESS q TO QUIT")
 	p.Height = 3
 	p.TextFgColor = ui.ColorWhite
 	p.Border.Label = "Text Box"
 	p.Border.FgColor = ui.ColorCyan
+	return
+}
+
+func createErrorBar() (p *ui.Par) {
+	p = ui.NewPar("")
+	p.Height = 3
+	p.TextFgColor = ui.ColorRed
+	p.HasBorder = false
+	return
+}
+
+func createStatusBar() (p *ui.Par) {
+	p = ui.NewPar("")
+	p.Height = 3
+	p.TextFgColor = ui.ColorGreen
+	p.HasBorder = true
 	return
 }
 
@@ -42,7 +59,7 @@ func createMemGauge() *ui.Gauge {
 func createContainerList() *ui.List {
 	list := ui.NewList()
 	list.ItemFgColor = ui.ColorYellow
-	list.HasBorder = false
+	list.HasBorder = true
 	return list
 }
 
@@ -57,15 +74,35 @@ func createDockerLineChart() *ui.LineChart {
 	return lc
 }
 
-func getNamesAndImagesOfRunning(cl *dockerClient.DockerClient) ([]string, []string) {
+func getNamesAndImagesOfRunning(cl *dockerClient.DockerClient, containerChan chan<- []goDocker.APIContainers) ([]string, []string) {
 	containers, _ := cl.ListContainers(goDocker.ListContainersOptions{})
 	names := make([]string, len(containers))
 	images := make([]string, len(containers))
 	for i, cont := range containers {
-		names[i] = strings.Join(cont.Names, "")
-		images[i] = cont.Image
+		names[i] = strings.TrimLeft(strings.Join(cont.Names, ""), "/")
+		images[i] = strings.Replace(cont.Image, "dockerregistry.pagero.local", "d.p.l", 1)
 	}
+	containerChan <- containers
 	return names, images
+}
+
+func updateStatisticsRoutines(cl *dockerClient.DockerClient, event *goDocker.APIEvents, deadContainerChan chan<- string, startedContainerChan chan<- string, statsChan chan *goDocker.Stats, errChan chan<- string) {
+	switch event.Status {
+	case "die":
+		go stopGettingStats(cl, event.ID, errChan)
+	case "start":
+		go startGettingStats(cl, event.ID, statsChan, errChan)
+	}
+}
+
+func startGettingStats(cl *dockerClient.DockerClient, id string, statsChan chan *goDocker.Stats, errChan chan<- string) {
+	if err := cl.Stats(goDocker.StatsOptions{id, statsChan, true, nil, 0}); err != nil {
+		errChan <- err.Error()
+	}
+}
+
+func stopGettingStats(cl *dockerClient.DockerClient, id string, errChan chan<- string) {
+
 }
 
 func main() {
@@ -82,38 +119,69 @@ func main() {
 
 	defer ui.Close()
 
-	p := createExitBar()
+	exitBar := createExitBar()
+	errorBar := createErrorBar()
+	statusBar := createStatusBar()
 
 	containerListOfNames := createContainerList()
+	containerListOfNames.Border.Label = "Name"
 	containerListOfImages := createContainerList()
-
-	lc := createDockerLineChart()
-
-	lc.Data = make([]float64, 0, 0)
+	containerListOfImages.Border.Label = "Image"
 
 	ui.Body.AddRows(
 		ui.NewRow(
-			ui.NewCol(6, 0, p),
+			ui.NewCol(12, 0, exitBar),
+		),
+		ui.NewRow(
+			ui.NewCol(12, 0, errorBar),
+		),
+		ui.NewRow(
+			ui.NewCol(12, 0, statusBar),
 		),
 		ui.NewRow(
 			ui.NewCol(3, 0, containerListOfNames),
-			ui.NewCol(3, 0, containerListOfImages),
+			ui.NewCol(9, 0, containerListOfImages),
 		),
 	)
 
 	// calculate layout
 	ui.Body.Align()
 
-	draw := func(t int) {
+	errChan := make(chan string, 10)
+	eventsChan := make(chan *goDocker.APIEvents, 10)
+	containersChan := make(chan []goDocker.APIContainers, 10)
+	deadContainerChan := make(chan string, 10)
+	startedContainerChan := make(chan string, 10)
+	statsChan := make(chan *goDocker.Stats)
 
-		names, images := getNamesAndImagesOfRunning(docker)
+	defer func() {
+		if err := docker.RemoveEventListener(eventsChan); err != nil {
+			panic(err)
+		}
+	}()
+
+	err = docker.AddEventListener(eventsChan)
+	if err != nil {
+		panic("Failed to add event listener: " + err.Error())
+	}
+
+	drawContainerList := func(t int) {
+
+		names, images := getNamesAndImagesOfRunning(docker, containersChan)
 		containerListOfNames.Items = names
 		containerListOfImages.Items = images
 		containerListOfNames.Height = len(names) + 1
 		containerListOfImages.Height = len(images) + 1
 
-		lc.Data = append(lc.Data, float64(len(names)))
-		ui.Render(p, containerListOfNames, containerListOfImages, lc)
+		//lc.Data = append(lc.Data, float64(len(names)))
+		ui.Render(ui.Body)
+
+	}
+	drawContainerList(0)
+
+	containers, _ := docker.ListContainers(goDocker.ListContainersOptions{})
+	for _, cont := range containers {
+		startedContainerChan <- cont.ID
 	}
 
 	evt := ui.EventCh()
@@ -121,19 +189,28 @@ func main() {
 	i := 0
 	for {
 		select {
+		case stats := <-statsChan:
+			statusBar.Text = "Got stats"
+			errChan <- fmt.Sprintf("%f", stats.CPUStats.SystemCPUUsage)
 		case e := <-evt:
+			statusBar.Text = "Got ui event"
 			if e.Type == ui.EventKey && e.Ch == 'q' {
 				return
 			}
 			if e.Type == ui.EventResize {
 				ui.Body.Width = ui.TermWidth()
 				ui.Body.Align()
-				go func() { evt <- ui.Event{} }()
 			}
-		default:
-			draw(i)
+		case err := <-errChan:
+			statusBar.Text = "Got error"
+			errorBar.Text = err
+		case e := <-eventsChan:
+			statusBar.Text = "Got docker event"
+			updateStatisticsRoutines(docker, e, deadContainerChan, startedContainerChan, statsChan, errChan)
+			drawContainerList(i)
 			i++
 			time.Sleep(time.Second / 2)
+		default:
 		}
 	}
 }
