@@ -112,7 +112,7 @@ func getNamesAndImagesOfContainers(containers map[string]*goDocker.Container) ([
 	var count int
 	for _, cont := range containers {
 		names[count] = cont.Name
-		images[count] = strings.Replace(cont.Image, "dockerregistry.pagero.local", "d.p.l", 1)
+		images[count] = strings.Replace(cont.Config.Image, "dockerregistry.pagero.local", "d.p.l", 1)
 		count++
 	}
 	return names, images
@@ -200,7 +200,7 @@ func main() {
 	/*
 	 *errChan := make(chan string, 10)
 	 */
-	eventsChan := make(chan *goDocker.APIEvents, 10)
+	dockerEventChan := make(chan *goDocker.APIEvents, 10)
 	containersChan := make(chan map[string]*goDocker.Container, 10)
 	deadContainerChan := make(chan string, 10)
 	startedContainerChan := make(chan string, 10)
@@ -210,13 +210,13 @@ func main() {
 	 *statsChan := make(chan *goDocker.Stats)
 	 */
 
-	err = docker.AddEventListener(eventsChan)
+	err = docker.AddEventListener(dockerEventChan)
 	if err != nil {
 		panic("Failed to add event listener: " + err.Error())
 	}
 
 	defer func() {
-		if err := docker.RemoveEventListener(eventsChan); err != nil {
+		if err := docker.RemoveEventListener(dockerEventChan); err != nil {
 			panic(err)
 		}
 	}()
@@ -279,6 +279,22 @@ func main() {
 		}
 	}
 	go updateWidgets()
+
+	dockerEventRouting := func() {
+		for {
+			select {
+			case e := <-dockerEventChan:
+				switch e.Status {
+				case "start":
+					startedContainerChan <- e.ID
+				case "die":
+					deadContainerChan <- e.ID
+				}
+			}
+		}
+	}
+
+	go dockerEventRouting()
 
 	//setup initial containers
 	containers, _ := docker.ListContainers(goDocker.ListContainersOptions{})
