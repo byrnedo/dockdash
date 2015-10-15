@@ -1,12 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"github.com/byrnedo/dockdash/dockerClient"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
 	"strings"
-	"time"
 )
 
 func createExitBar() (p *ui.Par) {
@@ -86,24 +84,26 @@ func getNamesAndImagesOfRunning(cl *dockerClient.DockerClient, containerChan cha
 	return names, images
 }
 
-func updateStatisticsRoutines(cl *dockerClient.DockerClient, event *goDocker.APIEvents, deadContainerChan chan<- string, startedContainerChan chan<- string, statsChan chan *goDocker.Stats, errChan chan<- string) {
-	switch event.Status {
-	case "die":
-		go stopGettingStats(cl, event.ID, errChan)
-	case "start":
-		go startGettingStats(cl, event.ID, statsChan, errChan)
-	}
-}
-
-func startGettingStats(cl *dockerClient.DockerClient, id string, statsChan chan *goDocker.Stats, errChan chan<- string) {
-	if err := cl.Stats(goDocker.StatsOptions{id, statsChan, true, nil, 0}); err != nil {
-		errChan <- err.Error()
-	}
-}
-
-func stopGettingStats(cl *dockerClient.DockerClient, id string, errChan chan<- string) {
-
-}
+/*
+ *func updateStatisticsRoutines(cl *dockerClient.DockerClient, event *goDocker.APIEvents, deadContainerChan chan<- string, startedContainerChan chan<- string, statsChan chan *goDocker.Stats, errChan chan<- string) {
+ *    switch event.Status {
+ *    case "die":
+ *        go stopGettingStats(cl, event.ID, errChan)
+ *    case "start":
+ *        go startGettingStats(cl, event.ID, statsChan, errChan)
+ *    }
+ *}
+ *
+ *func startGettingStats(cl *dockerClient.DockerClient, id string, statsChan chan *goDocker.Stats, errChan chan<- string) {
+ *    if err := cl.Stats(goDocker.StatsOptions{id, statsChan, true, nil, 0}); err != nil {
+ *        errChan <- err.Error()
+ *    }
+ *}
+ *
+ *func stopGettingStats(cl *dockerClient.DockerClient, id string, errChan chan<- string) {
+ *
+ *}
+ */
 
 func main() {
 
@@ -147,12 +147,22 @@ func main() {
 	// calculate layout
 	ui.Body.Align()
 
-	errChan := make(chan string, 10)
+	drawChan := make(chan bool)
+	/*
+	 *errChan := make(chan string, 10)
+	 */
 	eventsChan := make(chan *goDocker.APIEvents, 10)
-	containersChan := make(chan []goDocker.APIContainers, 10)
-	deadContainerChan := make(chan string, 10)
-	startedContainerChan := make(chan string, 10)
-	statsChan := make(chan *goDocker.Stats)
+	containersChan := make(chan map[string]*goDocker.APIContainers, 10)
+	deadContainerChan := make(chan *goDocker.APIContainers, 10)
+	startedContainerChan := make(chan *goDocker.APIContainers, 10)
+	/*
+	 *statsChan := make(chan *goDocker.Stats)
+	 */
+
+	err = docker.AddEventListener(eventsChan)
+	if err != nil {
+		panic("Failed to add event listener: " + err.Error())
+	}
 
 	defer func() {
 		if err := docker.RemoveEventListener(eventsChan); err != nil {
@@ -160,38 +170,55 @@ func main() {
 		}
 	}()
 
-	err = docker.AddEventListener(eventsChan)
-	if err != nil {
-		panic("Failed to add event listener: " + err.Error())
-	}
+	/*
+	 *    drawContainerList := func(t int) {
+	 *
+	 *        names, images := getNamesAndImagesOfRunning(docker, containersChan)
+	 *        containerListOfNames.Items = names
+	 *        containerListOfImages.Items = images
+	 *        containerListOfNames.Height = len(names) + 1
+	 *        containerListOfImages.Height = len(images) + 1
+	 *
+	 *        //lc.Data = append(lc.Data, float64(len(names)))
+	 *        ui.Render(ui.Body)
+	 *
+	 *    }
+	 *    drawContainerList(0)
+	 */
 
-	drawContainerList := func(t int) {
-
-		names, images := getNamesAndImagesOfRunning(docker, containersChan)
-		containerListOfNames.Items = names
-		containerListOfImages.Items = images
-		containerListOfNames.Height = len(names) + 1
-		containerListOfImages.Height = len(images) + 1
-
-		//lc.Data = append(lc.Data, float64(len(names)))
-		ui.Render(ui.Body)
-
-	}
-	drawContainerList(0)
-
+	//setup initial containers
 	containers, _ := docker.ListContainers(goDocker.ListContainersOptions{})
 	for _, cont := range containers {
-		startedContainerChan <- cont.ID
+		startedContainerChan <- &cont
 	}
 
 	evt := ui.EventCh()
 
-	i := 0
+	//handle container addition/removal
+	go func containerChangeRoutine() {
+		var currentContainers map[string]*goDocker.APIContainers
+		for {
+			select {
+			case newContainer := <-startedContainerChan:
+				currentContainers[newContainer.ID] = newContainer
+				containersChan <- currentContainers
+			case removedContainer := <-deadContainerChan:
+				delete(currentContainers, removedContainer.ID)
+				containersChan <- currentContainers
+			}
+		}
+	}()
+
+	go func updateWidgets(){
+		for {
+			select {
+			case containers := <-containersChan:
+			}
+		}
+	}()
+
 	for {
 		select {
-		case stats := <-statsChan:
-			statusBar.Text = "Got stats"
-			errChan <- fmt.Sprintf("%f", stats.CPUStats.SystemCPUUsage)
 		case e := <-evt:
 			statusBar.Text = "Got ui event"
 			if e.Type == ui.EventKey && e.Ch == 'q' {
@@ -201,16 +228,20 @@ func main() {
 				ui.Body.Width = ui.TermWidth()
 				ui.Body.Align()
 			}
-		case err := <-errChan:
-			statusBar.Text = "Got error"
-			errorBar.Text = err
-		case e := <-eventsChan:
-			statusBar.Text = "Got docker event"
-			updateStatisticsRoutines(docker, e, deadContainerChan, startedContainerChan, statsChan, errChan)
-			drawContainerList(i)
-			i++
-			time.Sleep(time.Second / 2)
-		default:
+		case _ = <-drawChan:
+			ui.Render(ui.Body)
+			/*
+			 *case err := <-errChan:
+			 *    statusBar.Text = "Got error"
+			 *    errorBar.Text = err
+			 *case e := <-eventsChan:
+			 *    statusBar.Text = "Got docker event"
+			 *    updateStatisticsRoutines(docker, e, deadContainerChan, startedContainerChan, statsChan, errChan)
+			 *    drawContainerList(i)
+			 *    i++
+			 *    time.Sleep(time.Second / 2)
+			 *default:
+			 */
 		}
 	}
 }
