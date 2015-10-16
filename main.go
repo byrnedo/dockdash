@@ -8,8 +8,21 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"strings"
 )
+
+type DockerInfoType int
+
+const (
+	ImageInfo DockerInfoType = iota
+	PortInfo
+	VolumesInfo
+	TimeInfo
+)
+
+const MaxContainers = 1000
+const MaxHorizPosition = 3
 
 var (
 	Trace   *log.Logger
@@ -17,6 +30,24 @@ var (
 	Warning *log.Logger
 	Error   *log.Logger
 )
+
+func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted []*goDocker.Container) {
+
+	sorted = make([]*goDocker.Container, len(mapToSort))
+	var keys []string
+	for k := range mapToSort {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// To perform the opertion you want
+	count := 0
+	for _, k := range keys {
+		sorted[count] = mapToSort[k]
+		count++
+	}
+	return
+}
 
 func InitLog(
 	traceHandle io.Writer,
@@ -106,24 +137,49 @@ func createDockerLineChart() *ui.LineChart {
 	return lc
 }
 
-func getNamesAndImagesOfContainers(containers map[string]*goDocker.Container) ([]string, []string) {
-	names := make([]string, len(containers))
-	images := make([]string, len(containers))
-	var count int
-	for _, cont := range containers {
-		names[count] = cont.Name
-		images[count] = strings.Replace(cont.Config.Image, "dockerregistry.pagero.local", "d.p.l", 1)
-		count++
+func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offset int, infoType DockerInfoType) ([]string, []string) {
+	if offset > len(containers) {
+		offset = len(containers) - 1
 	}
-	return names, images
+
+	numContainersSubset := len(containers) - offset
+
+	names := make([]string, numContainersSubset)
+	info := make([]string, numContainersSubset)
+
+	containersSorted := mapValuesSorted(containers)
+	for index, cont := range containersSorted {
+		if index < offset {
+			continue
+		}
+
+		names[index-offset] = strings.TrimLeft(cont.Name, "/")
+		switch infoType {
+		case ImageInfo:
+			info[index-offset] = strings.Replace(cont.Config.Image, "dockerregistry.pagero.local", "d.p.l", 1)
+		case PortInfo:
+			portStr := ""
+			for intPort, extHostPortList := range cont.NetworkSettings.Ports {
+				for _, extHostPort := range extHostPortList {
+					portStr = intPort.Port() + "->" + extHostPort.HostIP + ":" + extHostPort.HostPort + ","
+				}
+			}
+			info[index-offset] = portStr
+		case VolumesInfo:
+		case TimeInfo:
+		default:
+			Error.Println("Unhandled info type", infoType)
+		}
+	}
+	return names, info
 }
 
-func updateContainerList(listOfNames *ui.List, listOfImages *ui.List, containers map[string]*goDocker.Container) {
-	names, images := getNamesAndImagesOfContainers(containers)
-	listOfNames.Height = len(containers) + 2
-	listOfImages.Height = len(containers) + 2
-	listOfNames.Items = names
-	listOfImages.Items = images
+func updateContainerList(rightList *ui.List, leftList *ui.List, containers map[string]*goDocker.Container, offset int, horizPosition DockerInfoType) {
+	names, info := getNameAndInfoOfContainers(containers, offset, horizPosition)
+	rightList.Height = len(containers) + 2
+	leftList.Height = len(containers) + 2
+	rightList.Items = names
+	leftList.Items = info
 }
 
 /*
@@ -172,10 +228,10 @@ func main() {
 	errorBar := createErrorBar()
 	statusBar := createStatusBar()
 
-	containerListOfNames := createContainerList()
-	containerListOfNames.Border.Label = "Name"
-	containerListOfImages := createContainerList()
-	containerListOfImages.Border.Label = "Image"
+	containerListLeft := createContainerList()
+	containerListLeft.Border.Label = "Name"
+	containerListRight := createContainerList()
+	containerListRight.Border.Label = "Image"
 
 	ui.Body.AddRows(
 		ui.NewRow(
@@ -188,8 +244,8 @@ func main() {
 			ui.NewCol(12, 0, statusBar),
 		),
 		ui.NewRow(
-			ui.NewCol(3, 0, containerListOfNames),
-			ui.NewCol(9, 0, containerListOfImages),
+			ui.NewCol(3, 0, containerListLeft),
+			ui.NewCol(9, 0, containerListRight),
 		),
 	)
 
@@ -202,6 +258,9 @@ func main() {
 	 */
 	dockerEventChan := make(chan *goDocker.APIEvents, 10)
 	containersChan := make(chan map[string]*goDocker.Container, 10)
+	listStartOffsetChan := make(chan int)
+	horizPositionChan := make(chan int)
+	maxOffsetChan := make(chan int)
 	deadContainerChan := make(chan string, 10)
 	startedContainerChan := make(chan string, 10)
 	doneChan := make(chan bool)
@@ -222,17 +281,52 @@ func main() {
 	}()
 
 	uiRoutine := func() {
+		var horizPosition int = 0
+		var offset int = 0
+		var maxOffset int = 0
 		for {
 			select {
 			case e := <-evtChan:
 				Info.Println("Got ui event:", e)
-				if e.Type == ui.EventKey && e.Ch == 'q' {
-					doneChan <- true
+				if e.Type == ui.EventKey {
+					switch e.Ch {
+					case 'q':
+						doneChan <- true
+					case 0:
+						switch e.Key {
+						case ui.KeyArrowLeft:
+							if horizPosition > 0 {
+								horizPosition--
+							}
+							horizPositionChan <- offset
+						case ui.KeyArrowRight:
+							if horizPosition < MaxHorizPosition {
+								horizPosition++
+							}
+							horizPositionChan <- offset
+						case ui.KeyArrowDown:
+							if offset < maxOffset && offset < MaxContainers {
+								offset++
+							}
+							listStartOffsetChan <- offset
+							//shift the list down
+						case ui.KeyArrowUp:
+							if offset > 0 {
+								offset--
+							}
+							listStartOffsetChan <- offset
+							//shift the list up
+						default:
+							Info.Printf("Got unhandled key %d\n", e.Key)
+						}
+					}
 				}
 				if e.Type == ui.EventResize {
 					ui.Body.Width = ui.TermWidth()
 					ui.Body.Align()
 				}
+			case max := <-maxOffsetChan:
+				maxOffset = max
 			case _ = <-drawChan:
 				Info.Println("Got draw event")
 				ui.Render(ui.Body)
@@ -257,10 +351,12 @@ func main() {
 					continue
 				}
 				currentContainers[cont.ID] = cont
+				maxOffsetChan <- len(currentContainers) - 1
 				containersChan <- currentContainers
 			case removedContainerID := <-deadContainerChan:
 				Info.Println("Got dead container event")
 				delete(currentContainers, removedContainerID)
+				maxOffsetChan <- len(currentContainers) - 1
 				containersChan <- currentContainers
 			}
 		}
@@ -269,11 +365,22 @@ func main() {
 
 	Info.Println("Spinning off update widgets routine")
 	updateWidgets := func() {
+		lastContainersList := make(map[string]*goDocker.Container)
+		offset := 0
+		horizPosition := 0
 		for {
 			select {
+			case hp := <-horizPositionChan:
+				horizPosition = hp
+				Info.Println("Got changed horiz position", horizPosition)
 			case containers := <-containersChan:
 				Info.Println("Got containers changed event")
-				updateContainerList(containerListOfNames, containerListOfImages, containers)
+				updateContainerList(containerListLeft, containerListRight, containers, offset, DockerInfoType(horizPosition))
+				lastContainersList = containers
+				drawChan <- true
+			case offset = <-listStartOffsetChan:
+				Info.Println("Got list offset of", offset)
+				updateContainerList(containerListLeft, containerListRight, lastContainersList, offset, DockerInfoType(horizPosition))
 				drawChan <- true
 			}
 		}
