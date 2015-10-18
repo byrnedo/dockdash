@@ -31,6 +31,11 @@ var InfoHeaders map[DockerInfoType]string = map[DockerInfoType]string{
 const MaxContainers = 1000
 const MaxHorizPosition = int(TimeInfo)
 
+type StatsResult struct {
+	ID    string
+	Stats *goDocker.Stats
+}
+
 var (
 	Trace   *log.Logger
 	Info    *log.Logger
@@ -48,7 +53,7 @@ func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted []*goDock
 	sort.Strings(keys)
 
 	// To perform the opertion you want
-	count := 0
+	var count int
 	for _, k := range keys {
 		sorted[count] = mapToSort[k]
 		count++
@@ -173,15 +178,13 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 			continue
 		}
 
-		names[index-offset] = strings.TrimLeft(cont.Name, "/")
+		names[index-offset] = cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
 		switch infoType {
 		case ImageInfo:
 			info[index-offset] = strings.Replace(cont.Config.Image, "dockerregistry.pagero.local", "d.p.l", 1)
 		case PortInfo:
-			Info.Println("Creating list of", len(cont.NetworkSettings.Ports), "ports")
 			info[index-offset] = createPortsString(cont.NetworkSettings.Ports)
 		case VolumesInfo:
-			Info.Println("Creating list of", len(cont.Volumes), "volumes")
 			volStr := ""
 			for intVol, hostVol := range cont.Volumes {
 				volStr += intVol + ":" + hostVol + ","
@@ -196,35 +199,27 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 	return names, info
 }
 
-func updateContainerList(rightList *ui.List, leftList *ui.List, containers map[string]*goDocker.Container, offset int, horizPosition DockerInfoType) {
+func updateContainerList(leftList *ui.List, rightList *ui.List, containers map[string]*goDocker.Container, offset int, horizPosition DockerInfoType) {
 	names, info := getNameAndInfoOfContainers(containers, offset, horizPosition)
-	rightList.Height = len(containers) + 2
 	leftList.Height = len(containers) + 2
-	rightList.Items = names
-	leftList.Border.Label = InfoHeaders[horizPosition]
-	leftList.Items = info
+	rightList.Height = len(containers) + 2
+	leftList.Items = names
+	rightList.Border.Label = InfoHeaders[horizPosition]
+	rightList.Items = info
 }
 
-/*
- *func updateStatisticsRoutines(cl *dockerClient.DockerClient, event *goDocker.APIEvents, deadContainerChan chan<- string, startedContainerChan chan<- string, statsChan chan *goDocker.Stats, errChan chan<- string) {
- *    switch event.Status {
- *    case "die":
- *        go stopGettingStats(cl, event.ID, errChan)
- *    case "start":
- *        go startGettingStats(cl, event.ID, statsChan, errChan)
- *    }
- *}
- *
- *func startGettingStats(cl *dockerClient.DockerClient, id string, statsChan chan *goDocker.Stats, errChan chan<- string) {
- *    if err := cl.Stats(goDocker.StatsOptions{id, statsChan, true, nil, 0}); err != nil {
- *        errChan <- err.Error()
- *    }
- *}
- *
- *func stopGettingStats(cl *dockerClient.DockerClient, id string, errChan chan<- string) {
- *
- *}
- */
+func updateStatsBarChart(statsChart *ui.BarChart, statsList map[string]*goDocker.Stats) {
+
+	statsChart.DataLabels = make([]string, len(statsList))
+	statsChart.Data = make([]int, len(statsList))
+	count := 0
+	for key, nums := range statsList {
+		Info.Printf("%+v", nums)
+		statsChart.DataLabels[count] = key[:2]
+		statsChart.Data[count] = int(nums.CPUStats.CPUUsage.TotalUsage)
+		count++
+	}
+}
 
 func main() {
 	logPath := "/tmp/dockdash.log"
@@ -249,22 +244,24 @@ func main() {
 
 	exitBar := createExitBar()
 	errorBar := createErrorBar()
-	statusBar := createStatusBar()
 
 	containerListLeft := createContainerList()
 	containerListLeft.Border.Label = "Name"
 	containerListRight := createContainerList()
 	containerListRight.Border.Label = "Image"
 
+	statsChart := ui.NewBarChart()
+	statsChart.Height = 10
+
 	ui.Body.AddRows(
 		ui.NewRow(
 			ui.NewCol(12, 0, exitBar),
 		),
 		ui.NewRow(
-			ui.NewCol(12, 0, errorBar),
+			ui.NewCol(12, 0, statsChart),
 		),
 		ui.NewRow(
-			ui.NewCol(12, 0, statusBar),
+			ui.NewCol(12, 0, errorBar),
 		),
 		ui.NewRow(
 			ui.NewCol(3, 0, containerListLeft),
@@ -280,17 +277,21 @@ func main() {
 	 *errChan := make(chan string, 10)
 	 */
 	dockerEventChan := make(chan *goDocker.APIEvents, 10)
-	containersChan := make(chan map[string]*goDocker.Container, 10)
+	containersChan := make(chan map[string]*goDocker.Container)
 	listStartOffsetChan := make(chan int)
 	horizPositionChan := make(chan int)
 	maxOffsetChan := make(chan int)
-	deadContainerChan := make(chan string, 10)
-	startedContainerChan := make(chan string, 10)
+	deadContainerChan := make(chan string)
+	startedContainerChan := make(chan string)
 	doneChan := make(chan bool)
-	evtChan := ui.EventCh()
-	/*
-	 *statsChan := make(chan *goDocker.Stats)
-	 */
+	uiEventChan := ui.EventCh()
+
+	// Statistics
+	startGatheringStatisticsChan := make(chan string)
+	stopGatheringStatisticsChan := make(chan string)
+
+	statsResultsChan := make(chan *StatsResult)
+	statsResultsDoneChan := make(chan string)
 
 	err = docker.AddEventListener(dockerEventChan)
 	if err != nil {
@@ -303,13 +304,78 @@ func main() {
 		}
 	}()
 
+	statsRenderingRoutine := func() {
+		statsList := make(map[string]*goDocker.Stats)
+		for {
+			select {
+			case msg := <-statsResultsChan:
+				statsList[msg.ID] = msg.Stats
+				updateStatsBarChart(statsChart, statsList)
+				drawChan <- true
+			case id := <-statsResultsDoneChan:
+				delete(statsList, id)
+				updateStatsBarChart(statsChart, statsList)
+				drawChan <- true
+			}
+		}
+	}
+	go statsRenderingRoutine()
+
+	statsHandlingRoutine := func() {
+		statsDoneChannels := make(map[string]chan bool)
+		startsResultInterceptChannels := make(map[string]chan *goDocker.Stats)
+		startsResultInterceptDoneChannels := make(map[string]chan bool)
+		for {
+			select {
+			case id := <-startGatheringStatisticsChan:
+				statsDoneChannels[id] = make(chan bool, 1)
+				startsResultInterceptChannels[id] = make(chan *goDocker.Stats)
+				startsResultInterceptDoneChannels[id] = make(chan bool)
+				spinOffStatsInterceptor := func() {
+					for {
+						select {
+						case stat := <-startsResultInterceptChannels[id]:
+							statsResultsChan <- &StatsResult{id, stat}
+						case _ = <-startsResultInterceptDoneChannels[id]:
+							return
+						}
+					}
+				}
+				go spinOffStatsInterceptor()
+				Info.Println("Starting stats routine for", id)
+				spinOffStatsListener := func() {
+					if err := docker.Stats(goDocker.StatsOptions{id, startsResultInterceptChannels[id], true, statsDoneChannels[id], 0}); err != nil {
+						Error.Println("Error starting statistics handler for id", id, ":", err.Error())
+						startsResultInterceptDoneChannels[id] <- true
+						close(statsDoneChannels[id])
+						close(startsResultInterceptChannels[id])
+						delete(statsDoneChannels, id)
+						delete(startsResultInterceptChannels, id)
+						statsResultsDoneChan <- id
+					}
+				}
+				go spinOffStatsListener()
+			case id := <-stopGatheringStatisticsChan:
+				Info.Println("Stopping stats routine for", id)
+				statsDoneChannels[id] <- true
+				startsResultInterceptDoneChannels[id] <- true
+				close(statsDoneChannels[id])
+				close(startsResultInterceptChannels[id])
+				delete(statsDoneChannels, id)
+				delete(startsResultInterceptChannels, id)
+				statsResultsDoneChan <- id
+			}
+		}
+	}
+	go statsHandlingRoutine()
+
 	uiRoutine := func() {
 		var horizPosition int = 0
 		var offset int = 0
 		var maxOffset int = 0
 		for {
 			select {
-			case e := <-evtChan:
+			case e := <-uiEventChan:
 				Info.Println("Got ui event:", e)
 				if e.Type == ui.EventKey {
 					switch e.Ch {
@@ -376,11 +442,14 @@ func main() {
 				currentContainers[cont.ID] = cont
 				maxOffsetChan <- len(currentContainers) - 1
 				containersChan <- currentContainers
+				startGatheringStatisticsChan <- cont.ID
+
 			case removedContainerID := <-deadContainerChan:
 				Info.Println("Got dead container event")
 				delete(currentContainers, removedContainerID)
 				maxOffsetChan <- len(currentContainers) - 1
 				containersChan <- currentContainers
+				stopGatheringStatisticsChan <- removedContainerID
 			}
 		}
 	}
