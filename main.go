@@ -21,8 +21,15 @@ const (
 	TimeInfo
 )
 
+var InfoHeaders map[DockerInfoType]string = map[DockerInfoType]string{
+	ImageInfo:   "Images",
+	PortInfo:    "Ports",
+	VolumesInfo: "Volumes",
+	TimeInfo:    "Created At",
+}
+
 const MaxContainers = 1000
-const MaxHorizPosition = 3
+const MaxHorizPosition = int(TimeInfo)
 
 var (
 	Trace   *log.Logger
@@ -137,6 +144,19 @@ func createDockerLineChart() *ui.LineChart {
 	return lc
 }
 
+func createPortsString(ports map[goDocker.Port][]goDocker.PortBinding) (portsStr string) {
+
+	for intPort, extHostPortList := range ports {
+		if len(extHostPortList) == 0 {
+			portsStr += intPort.Port() + "->N/A,"
+		}
+		for _, extHostPort := range extHostPortList {
+			portsStr += intPort.Port() + "->" + extHostPort.HostIP + ":" + extHostPort.HostPort + ","
+		}
+	}
+	return strings.TrimLeft(portsStr, ",")
+}
+
 func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offset int, infoType DockerInfoType) ([]string, []string) {
 	if offset > len(containers) {
 		offset = len(containers) - 1
@@ -158,15 +178,17 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 		case ImageInfo:
 			info[index-offset] = strings.Replace(cont.Config.Image, "dockerregistry.pagero.local", "d.p.l", 1)
 		case PortInfo:
-			portStr := ""
-			for intPort, extHostPortList := range cont.NetworkSettings.Ports {
-				for _, extHostPort := range extHostPortList {
-					portStr = intPort.Port() + "->" + extHostPort.HostIP + ":" + extHostPort.HostPort + ","
-				}
-			}
-			info[index-offset] = portStr
+			Info.Println("Creating list of", len(cont.NetworkSettings.Ports), "ports")
+			info[index-offset] = createPortsString(cont.NetworkSettings.Ports)
 		case VolumesInfo:
+			Info.Println("Creating list of", len(cont.Volumes), "volumes")
+			volStr := ""
+			for intVol, hostVol := range cont.Volumes {
+				volStr += intVol + ":" + hostVol + ","
+			}
+			info[index-offset] = strings.TrimRight(volStr, ",")
 		case TimeInfo:
+			info[index-offset] = cont.Created.String()
 		default:
 			Error.Println("Unhandled info type", infoType)
 		}
@@ -179,6 +201,7 @@ func updateContainerList(rightList *ui.List, leftList *ui.List, containers map[s
 	rightList.Height = len(containers) + 2
 	leftList.Height = len(containers) + 2
 	rightList.Items = names
+	leftList.Border.Label = InfoHeaders[horizPosition]
 	leftList.Items = info
 }
 
@@ -298,12 +321,12 @@ func main() {
 							if horizPosition > 0 {
 								horizPosition--
 							}
-							horizPositionChan <- offset
+							horizPositionChan <- horizPosition
 						case ui.KeyArrowRight:
 							if horizPosition < MaxHorizPosition {
 								horizPosition++
 							}
-							horizPositionChan <- offset
+							horizPositionChan <- horizPosition
 						case ui.KeyArrowDown:
 							if offset < maxOffset && offset < MaxContainers {
 								offset++
@@ -373,6 +396,8 @@ func main() {
 			case hp := <-horizPositionChan:
 				horizPosition = hp
 				Info.Println("Got changed horiz position", horizPosition)
+				updateContainerList(containerListLeft, containerListRight, lastContainersList, offset, DockerInfoType(horizPosition))
+				drawChan <- true
 			case containers := <-containersChan:
 				Info.Println("Got containers changed event")
 				updateContainerList(containerListLeft, containerListRight, containers, offset, DockerInfoType(horizPosition))
