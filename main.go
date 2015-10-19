@@ -105,7 +105,7 @@ func createExitBar() (p *ui.Par) {
 	p = ui.NewPar(":PRESS q TO QUIT")
 	p.Height = 3
 	p.TextFgColor = ui.ColorWhite
-	p.Border.Label = "Text Box"
+	p.Border.Label = "Dockdash"
 	p.Border.FgColor = ui.ColorCyan
 	return
 }
@@ -335,12 +335,22 @@ func main() {
 		statsDoneChannels := make(map[string]chan bool)
 		startsResultInterceptChannels := make(map[string]chan *goDocker.Stats)
 		startsResultInterceptDoneChannels := make(map[string]chan bool)
+
+		closeAndDeleteChannels := func(id string) {
+			close(statsDoneChannels[id])
+			delete(statsDoneChannels, id)
+			delete(startsResultInterceptChannels, id)
+			statsResultsDoneChan <- id
+		}
+
 		for {
 			select {
 			case id := <-startGatheringStatisticsChan:
+
 				statsDoneChannels[id] = make(chan bool, 1)
 				startsResultInterceptChannels[id] = make(chan *goDocker.Stats)
 				startsResultInterceptDoneChannels[id] = make(chan bool)
+
 				spinOffStatsInterceptor := func() {
 					for {
 						select {
@@ -352,26 +362,21 @@ func main() {
 					}
 				}
 				go spinOffStatsInterceptor()
+
 				Info.Println("Starting stats routine for", id)
 				spinOffStatsListener := func() {
 					if err := docker.Stats(goDocker.StatsOptions{id, startsResultInterceptChannels[id], true, statsDoneChannels[id], 0}); err != nil {
 						Error.Println("Error starting statistics handler for id", id, ":", err.Error())
 						startsResultInterceptDoneChannels[id] <- true
-						close(statsDoneChannels[id])
-						delete(statsDoneChannels, id)
-						delete(startsResultInterceptChannels, id)
-						statsResultsDoneChan <- id
 					}
+					closeAndDeleteChannels(id)
 				}
 				go spinOffStatsListener()
 			case id := <-stopGatheringStatisticsChan:
 				Info.Println("Stopping stats routine for", id)
 				statsDoneChannels[id] <- true
 				startsResultInterceptDoneChannels[id] <- true
-				close(statsDoneChannels[id])
-				delete(statsDoneChannels, id)
-				delete(startsResultInterceptChannels, id)
-				statsResultsDoneChan <- id
+				closeAndDeleteChannels(id)
 			}
 		}
 	}
@@ -480,22 +485,25 @@ func main() {
 		var horizPosition = 0
 		var leftList = ui.NewList()
 		var rightList = ui.NewList()
+
+		updateContainersAndNotify := func() {
+			updateContainerList(leftList, rightList, lastContainersList, offset, DockerInfoType(horizPosition))
+			drawContainersChan <- &ContainersMsg{leftList, rightList}
+		}
+
 		for {
 			select {
 			case hp := <-horizPositionChan:
 				horizPosition = hp
 				Info.Println("Got changed horiz position", horizPosition)
-				updateContainerList(leftList, rightList, lastContainersList, offset, DockerInfoType(horizPosition))
-				drawContainersChan <- &ContainersMsg{leftList, rightList}
+				updateContainersAndNotify()
 			case containers := <-containersChan:
 				Info.Println("Got containers changed event")
-				updateContainerList(leftList, rightList, containers, offset, DockerInfoType(horizPosition))
 				lastContainersList = containers
-				drawContainersChan <- &ContainersMsg{leftList, rightList}
+				updateContainersAndNotify()
 			case offset = <-listStartOffsetChan:
 				Info.Println("Got list offset of", offset)
-				updateContainerList(leftList, rightList, lastContainersList, offset, DockerInfoType(horizPosition))
-				drawContainersChan <- &ContainersMsg{leftList, rightList}
+				updateContainersAndNotify()
 			}
 		}
 	}
