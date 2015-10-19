@@ -150,7 +150,7 @@ func createMemGauge() *ui.Gauge {
 
 func createContainerList() *ui.List {
 	list := ui.NewList()
-	list.ItemFgColor = ui.ColorYellow
+	list.ItemFgColor = ui.ColorCyan
 	list.HasBorder = false
 	return list
 }
@@ -233,10 +233,25 @@ func updateStatsBarChart(statsList map[string]*goDocker.Stats) *ui.BarChart {
 	count := 0
 	for key, nums := range statsList {
 		statsChart.DataLabels[count] = key[:2]
-		statsChart.Data[count] = int(nums.CPUStats.CPUUsage.TotalUsage / 1000000000)
+		statsChart.Data[count] = int(calculateCPUPercent(nums))
 		count++
 	}
 	return statsChart
+}
+
+func calculateCPUPercent(v *goDocker.Stats) float64 {
+	var (
+		cpuPercent = 0.0
+		// calculate the change for the cpu usage of the container in between readings
+		cpuDelta = float64(v.CPUStats.CPUUsage.TotalUsage - v.PreCPUStats.CPUUsage.TotalUsage)
+		// calculate the change for the entire system between readings
+		systemDelta = float64(v.CPUStats.SystemCPUUsage - v.PreCPUStats.SystemCPUUsage)
+	)
+
+	if systemDelta > 0.0 && cpuDelta > 0.0 {
+		cpuPercent = (cpuDelta / systemDelta) * float64(len(v.CPUStats.CPUUsage.PercpuUsage)) * 100.0
+	}
+	return cpuPercent
 }
 
 func makeLayout(exitBar *ui.Par, statsChart *ui.BarChart, leftList *ui.List, rightList *ui.List) {
