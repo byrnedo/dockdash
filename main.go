@@ -10,6 +10,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 )
 
 type DockerInfoType int
@@ -41,6 +42,20 @@ type ContainersMsg struct {
 	Right *ui.List
 }
 
+type ContainerSlice []*goDocker.Container
+
+func (p ContainerSlice) Len() int {
+	return len(p)
+}
+
+func (p ContainerSlice) Less(i, j int) bool {
+	return p[i].State.StartedAt.Before(p[j].State.StartedAt)
+}
+
+func (p ContainerSlice) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
+}
+
 var (
 	Trace   *log.Logger
 	Info    *log.Logger
@@ -58,23 +73,23 @@ var (
 	uiEventChan          = ui.EventCh()
 	drawContainersChan   = make(chan *ContainersMsg)
 	drawStatsChan        = make(chan *ui.BarChart)
+
+	startGatheringStatisticsChan = make(chan string)
+	stopGatheringStatisticsChan  = make(chan string)
+
+	statsResultsChan     = make(chan *StatsResult)
+	statsResultsDoneChan = make(chan string)
 )
 
-func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted []*goDocker.Container) {
+func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted ContainerSlice) {
 
-	sorted = make([]*goDocker.Container, len(mapToSort))
-	var keys []string
-	for k := range mapToSort {
-		keys = append(keys, k)
+	sorted = make(ContainerSlice, len(mapToSort))
+	var i = 0
+	for _, val := range mapToSort {
+		sorted[i] = val
+		i++
 	}
-	sort.Strings(keys)
-
-	// To perform the opertion you want
-	var count = 0
-	for _, k := range keys {
-		sorted[count] = mapToSort[k]
-		count++
-	}
+	sort.Sort(sorted)
 	return
 }
 
@@ -99,31 +114,6 @@ func InitLog(
 	Error = log.New(errorHandle,
 		"ERROR: ",
 		log.Ldate|log.Ltime|log.Lshortfile)
-}
-
-func createExitBar() (p *ui.Par) {
-	p = ui.NewPar(":PRESS q TO QUIT")
-	p.Height = 3
-	p.TextFgColor = ui.ColorWhite
-	p.Border.Label = "Dockdash"
-	p.Border.FgColor = ui.ColorCyan
-	return
-}
-
-func createErrorBar() (p *ui.Par) {
-	p = ui.NewPar("")
-	p.Height = 3
-	p.TextFgColor = ui.ColorRed
-	p.HasBorder = false
-	return
-}
-
-func createStatusBar() (p *ui.Par) {
-	p = ui.NewPar("")
-	p.Height = 3
-	p.TextFgColor = ui.ColorGreen
-	p.HasBorder = true
-	return
 }
 
 func createCPUGauge() *ui.Gauge {
@@ -151,7 +141,7 @@ func createMemGauge() *ui.Gauge {
 func createContainerList() *ui.List {
 	list := ui.NewList()
 	list.ItemFgColor = ui.ColorCyan
-	list.HasBorder = false
+	list.HasBorder = true
 	return list
 }
 
@@ -176,7 +166,7 @@ func createPortsString(ports map[goDocker.Port][]goDocker.PortBinding) (portsStr
 			portsStr += intPort.Port() + "->" + extHostPort.HostIP + ":" + extHostPort.HostPort + ","
 		}
 	}
-	return strings.TrimLeft(portsStr, ",")
+	return strings.TrimRight(portsStr, ",")
 }
 
 func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offset int, infoType DockerInfoType) ([]string, []string) {
@@ -198,7 +188,7 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 		names[index-offset] = cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
 		switch infoType {
 		case ImageInfo:
-			info[index-offset] = strings.Replace(cont.Config.Image, "dockerregistry.pagero.local", "d.p.l", 1)
+			info[index-offset] = cont.Config.Image
 		case PortInfo:
 			info[index-offset] = createPortsString(cont.NetworkSettings.Ports)
 		case VolumesInfo:
@@ -208,7 +198,7 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 			}
 			info[index-offset] = strings.TrimRight(volStr, ",")
 		case TimeInfo:
-			info[index-offset] = cont.Created.String()
+			info[index-offset] = cont.State.StartedAt.Format(time.RubyDate)
 		default:
 			Error.Println("Unhandled info type", infoType)
 		}
@@ -254,12 +244,9 @@ func calculateCPUPercent(v *goDocker.Stats) float64 {
 	return cpuPercent
 }
 
-func makeLayout(exitBar *ui.Par, statsChart *ui.BarChart, leftList *ui.List, rightList *ui.List) {
+func makeLayout(statsChart *ui.BarChart, leftList *ui.List, rightList *ui.List) {
 
 	ui.Body.AddRows(
-		ui.NewRow(
-			ui.NewCol(12, 0, exitBar),
-		),
 		ui.NewRow(
 			ui.NewCol(12, 0, statsChart),
 		),
@@ -271,7 +258,7 @@ func makeLayout(exitBar *ui.Par, statsChart *ui.BarChart, leftList *ui.List, rig
 }
 
 func main() {
-	logPath := "/tmp/dockdash.log"
+	var logPath = "/tmp/dockdash.log"
 	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		panic("Failed to open log file " + logPath + ":" + err.Error())
@@ -291,32 +278,21 @@ func main() {
 
 	defer ui.Close()
 
-	exitBar := createExitBar()
-
 	containerListLeft := createContainerList()
 	containerListLeft.Border.Label = "Name"
 	containerListRight := createContainerList()
 	containerListRight.Border.Label = "Image"
 
 	statsChart := ui.NewBarChart()
-	statsChart.HasBorder = false
+	statsChart.HasBorder = true
 	statsChart.Height = 10
 
-	makeLayout(exitBar, statsChart, containerListLeft, containerListRight)
+	makeLayout(statsChart, containerListLeft, containerListRight)
 
 	// calculate layout
 	ui.Body.Align()
 
-	/*
-	 *errChan := make(chan string, 10)
-	 */
-
 	// Statistics
-	startGatheringStatisticsChan := make(chan string)
-	stopGatheringStatisticsChan := make(chan string)
-
-	statsResultsChan := make(chan *StatsResult)
-	statsResultsDoneChan := make(chan string)
 
 	err = docker.AddEventListener(dockerEventChan)
 	if err != nil {
@@ -330,7 +306,7 @@ func main() {
 	}()
 
 	statsRenderingRoutine := func() {
-		statsList := make(map[string]*goDocker.Stats)
+		var statsList = make(map[string]*goDocker.Stats)
 		for {
 			select {
 			case msg := <-statsResultsChan:
@@ -347,9 +323,11 @@ func main() {
 	go statsRenderingRoutine()
 
 	statsHandlingRoutine := func() {
-		statsDoneChannels := make(map[string]chan bool)
-		startsResultInterceptChannels := make(map[string]chan *goDocker.Stats)
-		startsResultInterceptDoneChannels := make(map[string]chan bool)
+		var (
+			statsDoneChannels                 = make(map[string]chan bool)
+			startsResultInterceptChannels     = make(map[string]chan *goDocker.Stats)
+			startsResultInterceptDoneChannels = make(map[string]chan bool)
+		)
 
 		closeAndDeleteChannels := func(id string) {
 			close(statsDoneChannels[id])
@@ -398,9 +376,11 @@ func main() {
 	go statsHandlingRoutine()
 
 	uiRoutine := func() {
-		var horizPosition int = 0
-		var offset int = 0
-		var maxOffset int = 0
+		var (
+			horizPosition int = 0
+			offset        int = 0
+			maxOffset     int = 0
+		)
 		for {
 			select {
 			case e := <-uiEventChan:
@@ -467,7 +447,7 @@ func main() {
 	//handle container addition/removal
 	Info.Println("Spinning off container change routine")
 	containerChangeRoutine := func() {
-		currentContainers := make(map[string]*goDocker.Container)
+		var currentContainers = make(map[string]*goDocker.Container)
 		for {
 			select {
 			case newContainerID := <-startedContainerChan:
@@ -495,12 +475,13 @@ func main() {
 
 	Info.Println("Spinning off update widgets routine")
 	updateWidgets := func() {
-		var lastContainersList = make(map[string]*goDocker.Container)
-		var offset = 0
-		var horizPosition = 0
-		var leftList = ui.NewList()
-		var rightList = ui.NewList()
-
+		var (
+			lastContainersList = make(map[string]*goDocker.Container)
+			offset             = 0
+			horizPosition      = 0
+			leftList           = ui.NewList()
+			rightList          = ui.NewList()
+		)
 		updateContainersAndNotify := func() {
 			updateContainerList(leftList, rightList, lastContainersList, offset, DockerInfoType(horizPosition))
 			drawContainersChan <- &ContainersMsg{leftList, rightList}
