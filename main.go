@@ -70,6 +70,11 @@ func (p ContainerSlice) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
 }
 
+type StatsCharts struct {
+	CpuChart *ui.BarChart
+	MemChart *ui.BarChart
+}
+
 var (
 	Trace   *log.Logger
 	Info    *log.Logger
@@ -86,7 +91,7 @@ var (
 	doneChan             = make(chan bool)
 	uiEventChan          = ui.EventCh()
 	drawContainersChan   = make(chan *ContainersMsg)
-	drawStatsChan        = make(chan *ui.BarChart)
+	drawStatsChan        = make(chan *StatsCharts)
 
 	startGatheringStatisticsChan = make(chan *goDocker.Container)
 	stopGatheringStatisticsChan  = make(chan string)
@@ -229,14 +234,23 @@ func updateContainerList(leftList *ui.List, rightList *ui.List, containers map[s
 	rightList.Items = info
 }
 
-func updateStatsBarChart(statsList map[string]*StatsResult) *ui.BarChart {
+func updateStatsBarCharts(statsList map[string]*StatsResult) (statsCpuChart *ui.BarChart, statsMemChart *ui.BarChart) {
+	// need to make new ones as otherwise we may lose some pointers if something else happens at the same time
+	statsCpuChart = ui.NewBarChart()
+	statsMemChart = ui.NewBarChart()
+
+	var statsListLen = len(statsList)
 
 	var (
-		statsChart  = ui.NewBarChart()
-		orderedList = make(StatsResultSlice, len(statsList))
+		orderedList = make(StatsResultSlice, statsListLen)
 	)
-	statsChart.DataLabels = make([]string, len(statsList))
-	statsChart.Data = make([]int, len(statsList))
+
+	statsCpuChart.DataLabels = make([]string, statsListLen)
+	statsCpuChart.Data = make([]int, statsListLen)
+
+	statsMemChart.DataLabels = make([]string, statsListLen)
+	statsMemChart.Data = make([]int, statsListLen)
+
 	count := 0
 	for _, nums := range statsList {
 		orderedList[count] = nums
@@ -246,10 +260,17 @@ func updateStatsBarChart(statsList map[string]*StatsResult) *ui.BarChart {
 	sort.Sort(orderedList)
 
 	for count, stats := range orderedList {
-		statsChart.DataLabels[count] = stats.Container.ID[:2]
-		statsChart.Data[count] = int(calculateCPUPercent(stats.Stats))
+		statsCpuChart.DataLabels[count] = stats.Container.ID[:2]
+		statsCpuChart.Data[count] = int(calculateCPUPercent(stats.Stats))
+
+		statsMemChart.DataLabels[count] = stats.Container.ID[:2]
+		if stats.Stats.MemoryStats.Limit != 0 {
+			statsMemChart.Data[count] = int(float64(stats.Stats.MemoryStats.Usage) / float64(stats.Stats.MemoryStats.Limit) * 100)
+		} else {
+			statsMemChart.Data[count] = 0
+		}
 	}
-	return statsChart
+	return statsCpuChart, statsMemChart
 }
 
 func calculateCPUPercent(v *goDocker.Stats) float64 {
@@ -267,11 +288,14 @@ func calculateCPUPercent(v *goDocker.Stats) float64 {
 	return cpuPercent
 }
 
-func makeLayout(statsChart *ui.BarChart, leftList *ui.List, rightList *ui.List) {
+func makeLayout(statsCpuChart *ui.BarChart, statsMemChart *ui.BarChart, leftList *ui.List, rightList *ui.List) {
 
 	ui.Body.AddRows(
 		ui.NewRow(
-			ui.NewCol(12, 0, statsChart),
+			ui.NewCol(12, 0, statsCpuChart),
+		),
+		ui.NewRow(
+			ui.NewCol(12, 0, statsMemChart),
 		),
 		ui.NewRow(
 			ui.NewCol(3, 0, leftList),
@@ -306,11 +330,17 @@ func main() {
 	containerListRight := createContainerList()
 	containerListRight.Border.Label = "Image"
 
-	statsChart := ui.NewBarChart()
-	statsChart.HasBorder = true
-	statsChart.Height = 10
+	statsCpuChart := ui.NewBarChart()
+	statsCpuChart.HasBorder = true
+	statsCpuChart.Border.Label = "% CPU"
+	statsCpuChart.Height = 10
 
-	makeLayout(statsChart, containerListLeft, containerListRight)
+	statsMemChart := ui.NewBarChart()
+	statsMemChart.HasBorder = true
+	statsMemChart.Border.Label = "% MEM"
+	statsMemChart.Height = 10
+
+	makeLayout(statsCpuChart, statsMemChart, containerListLeft, containerListRight)
 
 	// calculate layout
 	ui.Body.Align()
@@ -337,12 +367,12 @@ func main() {
 			select {
 			case msg := <-statsResultsChan:
 				statsList[msg.Container.ID] = msg
-				statsChart := updateStatsBarChart(statsList)
-				drawStatsChan <- statsChart
+				statsCpuChart, statsMemChart := updateStatsBarCharts(statsList)
+				drawStatsChan <- &StatsCharts{statsCpuChart, statsMemChart}
 			case id := <-statsResultsDoneChan:
 				delete(statsList, id)
-				statsChart := updateStatsBarChart(statsList)
-				drawStatsChan <- statsChart
+				statsCpuChart, statsMemChart := updateStatsBarCharts(statsList)
+				drawStatsChan <- &StatsCharts{statsCpuChart, statsMemChart}
 			}
 		}
 	}
@@ -458,10 +488,12 @@ func main() {
 				containerListRight.Items = cons.Right.Items
 				containerListRight.Border.Label = cons.Right.Border.Label
 				ui.Render(ui.Body)
-			case newStatsChart := <-drawStatsChan:
+			case newStatsCharts := <-drawStatsChan:
 				Info.Println("Got draw stats event")
-				statsChart.Data = newStatsChart.Data
-				statsChart.DataLabels = newStatsChart.DataLabels
+				statsCpuChart.Data = newStatsCharts.CpuChart.Data
+				statsCpuChart.DataLabels = newStatsCharts.CpuChart.DataLabels
+				statsMemChart.Data = newStatsCharts.MemChart.Data
+				statsMemChart.DataLabels = newStatsCharts.MemChart.DataLabels
 				ui.Render(ui.Body)
 			}
 		}
