@@ -4,7 +4,7 @@ Realtime docker ps and stats viewer.
 
 Built in go.
 
-<img src="./screencap.jpg" alt="Screen grab" width="600">
+<img src="./gui.gif" alt="Screen grab" width="600">
 
 Use arrow keys to jump between data and traverse container list.
 

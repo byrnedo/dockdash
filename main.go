@@ -332,12 +332,12 @@ func main() {
 
 	statsCpuChart := ui.NewBarChart()
 	statsCpuChart.HasBorder = true
-	statsCpuChart.Border.Label = "% CPU"
+	statsCpuChart.Border.Label = "%CPU"
 	statsCpuChart.Height = 10
 
 	statsMemChart := ui.NewBarChart()
 	statsMemChart.HasBorder = true
-	statsMemChart.Border.Label = "% MEM"
+	statsMemChart.Border.Label = "%MEM"
 	statsMemChart.Height = 10
 
 	makeLayout(statsCpuChart, statsMemChart, containerListLeft, containerListRight)
