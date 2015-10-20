@@ -248,7 +248,6 @@ func updateStatsBarChart(statsList map[string]*StatsResult) *ui.BarChart {
 	for count, stats := range orderedList {
 		statsChart.DataLabels[count] = stats.Container.ID[:2]
 		statsChart.Data[count] = int(calculateCPUPercent(stats.Stats))
-		count++
 	}
 	return statsChart
 }
