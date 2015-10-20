@@ -33,8 +33,22 @@ const MaxContainers = 1000
 const MaxHorizPosition = int(TimeInfo)
 
 type StatsResult struct {
-	ID    string
-	Stats *goDocker.Stats
+	Container *goDocker.Container
+	Stats     *goDocker.Stats
+}
+
+type StatsResultSlice []*StatsResult
+
+func (p StatsResultSlice) Len() int {
+	return len(p)
+}
+
+func (p StatsResultSlice) Less(i, j int) bool {
+	return p[i].Container.State.StartedAt.Before(p[j].Container.State.StartedAt)
+}
+
+func (p StatsResultSlice) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
 }
 
 type ContainersMsg struct {
@@ -74,7 +88,7 @@ var (
 	drawContainersChan   = make(chan *ContainersMsg)
 	drawStatsChan        = make(chan *ui.BarChart)
 
-	startGatheringStatisticsChan = make(chan string)
+	startGatheringStatisticsChan = make(chan *goDocker.Container)
 	stopGatheringStatisticsChan  = make(chan string)
 
 	statsResultsChan     = make(chan *StatsResult)
@@ -215,15 +229,25 @@ func updateContainerList(leftList *ui.List, rightList *ui.List, containers map[s
 	rightList.Items = info
 }
 
-func updateStatsBarChart(statsList map[string]*goDocker.Stats) *ui.BarChart {
+func updateStatsBarChart(statsList map[string]*StatsResult) *ui.BarChart {
 
-	statsChart := ui.NewBarChart()
+	var (
+		statsChart  = ui.NewBarChart()
+		orderedList = make(StatsResultSlice, len(statsList))
+	)
 	statsChart.DataLabels = make([]string, len(statsList))
 	statsChart.Data = make([]int, len(statsList))
 	count := 0
-	for key, nums := range statsList {
-		statsChart.DataLabels[count] = key[:2]
-		statsChart.Data[count] = int(calculateCPUPercent(nums))
+	for _, nums := range statsList {
+		orderedList[count] = nums
+		count++
+	}
+
+	sort.Sort(orderedList)
+
+	for count, stats := range orderedList {
+		statsChart.DataLabels[count] = stats.Container.ID[:2]
+		statsChart.Data[count] = int(calculateCPUPercent(stats.Stats))
 		count++
 	}
 	return statsChart
@@ -306,11 +330,14 @@ func main() {
 	}()
 
 	statsRenderingRoutine := func() {
-		var statsList = make(map[string]*goDocker.Stats)
+
+		var (
+			statsList = make(map[string]*StatsResult)
+		)
 		for {
 			select {
 			case msg := <-statsResultsChan:
-				statsList[msg.ID] = msg.Stats
+				statsList[msg.Container.ID] = msg
 				statsChart := updateStatsBarChart(statsList)
 				drawStatsChan <- statsChart
 			case id := <-statsResultsDoneChan:
@@ -338,31 +365,31 @@ func main() {
 
 		for {
 			select {
-			case id := <-startGatheringStatisticsChan:
+			case cont := <-startGatheringStatisticsChan:
 
-				statsDoneChannels[id] = make(chan bool, 1)
-				startsResultInterceptChannels[id] = make(chan *goDocker.Stats)
-				startsResultInterceptDoneChannels[id] = make(chan bool)
+				statsDoneChannels[cont.ID] = make(chan bool, 1)
+				startsResultInterceptChannels[cont.ID] = make(chan *goDocker.Stats)
+				startsResultInterceptDoneChannels[cont.ID] = make(chan bool)
 
 				spinOffStatsInterceptor := func() {
 					for {
 						select {
-						case stat := <-startsResultInterceptChannels[id]:
-							statsResultsChan <- &StatsResult{id, stat}
-						case _ = <-startsResultInterceptDoneChannels[id]:
+						case stat := <-startsResultInterceptChannels[cont.ID]:
+							statsResultsChan <- &StatsResult{cont, stat}
+						case _ = <-startsResultInterceptDoneChannels[cont.ID]:
 							return
 						}
 					}
 				}
 				go spinOffStatsInterceptor()
 
-				Info.Println("Starting stats routine for", id)
+				Info.Println("Starting stats routine for", cont.ID)
 				spinOffStatsListener := func() {
-					if err := docker.Stats(goDocker.StatsOptions{id, startsResultInterceptChannels[id], true, statsDoneChannels[id], 0}); err != nil {
-						Error.Println("Error starting statistics handler for id", id, ":", err.Error())
-						startsResultInterceptDoneChannels[id] <- true
+					if err := docker.Stats(goDocker.StatsOptions{cont.ID, startsResultInterceptChannels[cont.ID], true, statsDoneChannels[cont.ID], 0}); err != nil {
+						Error.Println("Error starting statistics handler for id", cont.ID, ":", err.Error())
+						startsResultInterceptDoneChannels[cont.ID] <- true
 					}
-					closeAndDeleteChannels(id)
+					closeAndDeleteChannels(cont.ID)
 				}
 				go spinOffStatsListener()
 			case id := <-stopGatheringStatisticsChan:
@@ -442,8 +469,6 @@ func main() {
 	}
 	go uiRoutine()
 
-	Info.Println("Sending initial draw signal")
-
 	//handle container addition/removal
 	Info.Println("Spinning off container change routine")
 	containerChangeRoutine := func() {
@@ -460,7 +485,7 @@ func main() {
 				currentContainers[cont.ID] = cont
 				maxOffsetChan <- len(currentContainers) - 1
 				containersChan <- currentContainers
-				startGatheringStatisticsChan <- cont.ID
+				startGatheringStatisticsChan <- cont
 
 			case removedContainerID := <-deadContainerChan:
 				Info.Println("Got dead container event")
