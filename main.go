@@ -495,10 +495,10 @@ func main() {
 			case newStatsCharts := <-drawStatsChan:
 				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
 					Info.Println("Got draw stats event")
-					statsCpuChart.Data = newStatsCharts.CpuChart.Data
-					statsCpuChart.DataLabels = newStatsCharts.CpuChart.DataLabels
-					statsMemChart.Data = newStatsCharts.MemChart.Data
-					statsMemChart.DataLabels = newStatsCharts.MemChart.DataLabels
+					statsCpuChart.Data = newStatsCharts.CpuChart.Data[offset:]
+					statsCpuChart.DataLabels = newStatsCharts.CpuChart.DataLabels[offset:]
+					statsMemChart.Data = newStatsCharts.MemChart.Data[offset:]
+					statsMemChart.DataLabels = newStatsCharts.MemChart.DataLabels[offset:]
 					ui.Render(ui.Body)
 					lastStatsRender = time.Now()
 				}
