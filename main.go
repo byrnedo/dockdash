@@ -389,6 +389,7 @@ func main() {
 			close(statsDoneChannels[id])
 			delete(statsDoneChannels, id)
 			delete(startsResultInterceptChannels, id)
+			delete(startsResultInterceptDoneChannels, id)
 			statsResultsDoneChan <- id
 		}
 
@@ -433,9 +434,10 @@ func main() {
 
 	uiRoutine := func() {
 		var (
-			horizPosition int = 0
-			offset        int = 0
-			maxOffset     int = 0
+			horizPosition   int       = 0
+			offset          int       = 0
+			maxOffset       int       = 0
+			lastStatsRender time.Time = time.Time{}
 		)
 		for {
 			select {
@@ -478,6 +480,7 @@ func main() {
 					ui.Body.Width = ui.TermWidth()
 					ui.Body.Align()
 				}
+				ui.Render(ui.Body)
 			case max := <-maxOffsetChan:
 				maxOffset = max
 			case cons := <-drawContainersChan:
@@ -488,13 +491,17 @@ func main() {
 				containerListRight.Items = cons.Right.Items
 				containerListRight.Border.Label = cons.Right.Border.Label
 				ui.Render(ui.Body)
+
 			case newStatsCharts := <-drawStatsChan:
-				Info.Println("Got draw stats event")
-				statsCpuChart.Data = newStatsCharts.CpuChart.Data
-				statsCpuChart.DataLabels = newStatsCharts.CpuChart.DataLabels
-				statsMemChart.Data = newStatsCharts.MemChart.Data
-				statsMemChart.DataLabels = newStatsCharts.MemChart.DataLabels
-				ui.Render(ui.Body)
+				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
+					Info.Println("Got draw stats event")
+					statsCpuChart.Data = newStatsCharts.CpuChart.Data
+					statsCpuChart.DataLabels = newStatsCharts.CpuChart.DataLabels
+					statsMemChart.Data = newStatsCharts.MemChart.Data
+					statsMemChart.DataLabels = newStatsCharts.MemChart.DataLabels
+					ui.Render(ui.Body)
+					lastStatsRender = time.Now()
+				}
 			}
 		}
 	}
