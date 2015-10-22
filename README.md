@@ -14,6 +14,7 @@ W.I.P right now, please let me know if there's anything you think I should add t
 
 ##Todo
 1. Clean up code.
-2. Add more viewable data (ENVs, Entrypoint, Command)
+2. ~~Add more viewable data (ENVs, Entrypoint, Command)~~
 3. Batch draw requests
+4. Handle multiline info somehow
 
