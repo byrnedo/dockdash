@@ -18,3 +18,6 @@ W.I.P right now, please let me know if there's anything you think I should add t
 3. Batch draw requests
 4. Handle multiline info somehow
 
+#PS
+If judging code quality please be gentle, I plan to remove a lot of the unnecessary channels
+and break apart the code a little more.
