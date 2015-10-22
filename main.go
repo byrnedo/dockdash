@@ -18,20 +18,22 @@ type DockerInfoType int
 const (
 	ImageInfo DockerInfoType = iota
 	PortInfo
-	VolumesInfo
+	BindInfo
 	CommandInfo
 	EntrypointInfo
 	EnvInfo
+	VolumesInfo
 	TimeInfo
 )
 
 var InfoHeaders map[DockerInfoType]string = map[DockerInfoType]string{
 	ImageInfo:      "Image",
 	PortInfo:       "Ports",
-	VolumesInfo:    "Volumes",
+	BindInfo:       "Mounts",
 	CommandInfo:    "Command",
 	EntrypointInfo: "Entrypoint",
 	EnvInfo:        "Envs",
+	VolumesInfo:    "Volumes",
 	TimeInfo:       "Created At",
 }
 
@@ -216,18 +218,20 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 			info[index-offset] = cont.Config.Image
 		case PortInfo:
 			info[index-offset] = createPortsString(cont.NetworkSettings.Ports)
-		case VolumesInfo:
-			volStr := ""
-			for intVol, hostVol := range cont.Volumes {
-				volStr += intVol + ":" + hostVol + ","
-			}
-			info[index-offset] = strings.TrimRight(volStr, ",")
+		case BindInfo:
+			info[index-offset] = strings.Join(cont.HostConfig.Binds, ",")
 		case CommandInfo:
 			info[index-offset] = cont.Path + " " + strings.Join(cont.Args, " ")
 		case EnvInfo:
 			info[index-offset] = strings.Join(cont.Config.Env, ",")
 		case EntrypointInfo:
 			info[index-offset] = strings.Join(cont.Config.Entrypoint, " ")
+		case VolumesInfo:
+			volStr := ""
+			for intVol, hostVol := range cont.Volumes {
+				volStr += intVol + ":" + hostVol + ","
+			}
+			info[index-offset] = strings.TrimRight(volStr, ",")
 		case TimeInfo:
 			info[index-offset] = cont.State.StartedAt.Format(time.RubyDate)
 		default:
