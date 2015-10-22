@@ -465,6 +465,8 @@ func main() {
 						doneChan <- true
 					case 0:
 						switch e.Key {
+						case ui.KeyCtrlC, ui.KeyCtrlD:
+							doneChan <- true
 						case ui.KeyArrowLeft:
 							if horizPosition > 0 {
 								horizPosition--
