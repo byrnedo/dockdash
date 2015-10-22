@@ -19,14 +19,20 @@ const (
 	ImageInfo DockerInfoType = iota
 	PortInfo
 	VolumesInfo
+	CommandInfo
+	EntrypointInfo
+	EnvInfo
 	TimeInfo
 )
 
 var InfoHeaders map[DockerInfoType]string = map[DockerInfoType]string{
-	ImageInfo:   "Images",
-	PortInfo:    "Ports",
-	VolumesInfo: "Volumes",
-	TimeInfo:    "Created At",
+	ImageInfo:      "Image",
+	PortInfo:       "Ports",
+	VolumesInfo:    "Volumes",
+	CommandInfo:    "Command",
+	EntrypointInfo: "Entrypoint",
+	EnvInfo:        "Envs",
+	TimeInfo:       "Created At",
 }
 
 const MaxContainers = 1000
@@ -216,6 +222,12 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 				volStr += intVol + ":" + hostVol + ","
 			}
 			info[index-offset] = strings.TrimRight(volStr, ",")
+		case CommandInfo:
+			info[index-offset] = cont.Path + " " + strings.Join(cont.Args, " ")
+		case EnvInfo:
+			info[index-offset] = strings.Join(cont.Config.Env, ",")
+		case EntrypointInfo:
+			info[index-offset] = strings.Join(cont.Config.Entrypoint, " ")
 		case TimeInfo:
 			info[index-offset] = cont.State.StartedAt.Format(time.RubyDate)
 		default:
@@ -493,12 +505,12 @@ func main() {
 				ui.Render(ui.Body)
 
 			case newStatsCharts := <-drawStatsChan:
+				statsCpuChart.Data = newStatsCharts.CpuChart.Data[offset:]
+				statsCpuChart.DataLabels = newStatsCharts.CpuChart.DataLabels[offset:]
+				statsMemChart.Data = newStatsCharts.MemChart.Data[offset:]
+				statsMemChart.DataLabels = newStatsCharts.MemChart.DataLabels[offset:]
 				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
 					Info.Println("Got draw stats event")
-					statsCpuChart.Data = newStatsCharts.CpuChart.Data[offset:]
-					statsCpuChart.DataLabels = newStatsCharts.CpuChart.DataLabels[offset:]
-					statsMemChart.Data = newStatsCharts.MemChart.Data[offset:]
-					statsMemChart.DataLabels = newStatsCharts.MemChart.DataLabels[offset:]
 					ui.Render(ui.Body)
 					lastStatsRender = time.Now()
 				}
