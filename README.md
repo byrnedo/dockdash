@@ -14,7 +14,7 @@ W.I.P right now, please let me know if there's anything you think I should add t
 
 #Getting Started
 
-Check out the [releases](./releases) page to get binaries. 
+Check out the [releases](http://github.com/byrnedo/dockdash/releases) page to get binaries. 
 
 If you want for a specific arch just raise a ticket.
 
