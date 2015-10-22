@@ -4,9 +4,9 @@ build:
 	mkdir -p build && go get && go build -o build/dockdash
 
 release:
-	mkdir -p build/releases && \
-		go get && \
-		env GOOS=linux GOARCH=386 go build -o build/releases/linux/386/dockdash &&\
-		(cd build/releases/linux/386/ && zip ../../dockdash_linux_386.zip  dockdash) &&\
-		env GOOS=linux GOARCH=amd64 go build -o build/releases/linux/amd64/dockdash &&\
-		(cd build/releases/linux/amd64/ && zip ../../dockdash_linux_amd64.zip dockdash)
+	mkdir -p build/releases && go get && for linux_arch in 386 amd64; \
+		do \
+		env GOOS=linux GOARCH=$$linux_arch go build -o build/releases/linux/$$linux_arch/dockdash && \
+		(cd build/releases/linux/$$linux_arch/ && zip ../../dockdash_linux_$$linux_arch.zip  dockdash); \
+		done;
+
