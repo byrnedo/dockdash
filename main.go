@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -212,7 +213,7 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 			continue
 		}
 
-		names[index-offset] = cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
+		names[index-offset] = "(" + strconv.Itoa(index+1) + ") " + cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
 		switch infoType {
 		case ImageInfo:
 			info[index-offset] = cont.Config.Image
@@ -276,10 +277,10 @@ func updateStatsBarCharts(statsList map[string]*StatsResult) (statsCpuChart *ui.
 	sort.Sort(orderedList)
 
 	for count, stats := range orderedList {
-		statsCpuChart.DataLabels[count] = stats.Container.ID[:2]
+		statsCpuChart.DataLabels[count] = strconv.Itoa(count + 1)
 		statsCpuChart.Data[count] = int(calculateCPUPercent(stats.Stats))
 
-		statsMemChart.DataLabels[count] = stats.Container.ID[:2]
+		statsMemChart.DataLabels[count] = strconv.Itoa(count + 1)
 		if stats.Stats.MemoryStats.Limit != 0 {
 			statsMemChart.Data[count] = int(float64(stats.Stats.MemoryStats.Usage) / float64(stats.Stats.MemoryStats.Limit) * 100)
 		} else {
