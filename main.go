@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -79,51 +78,6 @@ func createPortsString(ports map[goDocker.Port][]goDocker.PortBinding) (portsStr
 	return strings.TrimRight(portsStr, ",")
 }
 
-func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offset int, infoType DockerInfoType) ([]string, []string) {
-	if offset > len(containers) {
-		offset = len(containers) - 1
-	}
-
-	numContainersSubset := len(containers) - offset
-
-	names := make([]string, numContainersSubset)
-	info := make([]string, numContainersSubset)
-
-	containersSorted := mapValuesSorted(containers)
-	for index, cont := range containersSorted {
-		if index < offset {
-			continue
-		}
-
-		names[index-offset] = "(" + strconv.Itoa(index+1) + ") " + cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
-		switch infoType {
-		case ImageInfo:
-			info[index-offset] = cont.Config.Image
-		case PortInfo:
-			info[index-offset] = createPortsString(cont.NetworkSettings.Ports)
-		case BindInfo:
-			info[index-offset] = strings.TrimRight(strings.Join(cont.HostConfig.Binds, ","), ",")
-		case CommandInfo:
-			info[index-offset] = cont.Path + " " + strings.Join(cont.Args, " ")
-		case EnvInfo:
-			info[index-offset] = strings.TrimRight(strings.Join(cont.Config.Env, ","), ",")
-		case EntrypointInfo:
-			info[index-offset] = strings.Join(cont.Config.Entrypoint, " ")
-		case VolumesInfo:
-			volStr := ""
-			for intVol, hostVol := range cont.Volumes {
-				volStr += intVol + ":" + hostVol + ","
-			}
-			info[index-offset] = strings.TrimRight(volStr, ",")
-		case TimeInfo:
-			info[index-offset] = cont.State.StartedAt.Format(time.RubyDate)
-		default:
-			Error.Println("Unhandled info type", infoType)
-		}
-	}
-	return names, info
-}
-
 func main() {
 	var logPath = "/tmp/dockdash.log"
 	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -163,16 +117,6 @@ func main() {
 			lastStatsRender   time.Time = time.Time{}
 			currentContainers           = make(map[string]*goDocker.Container)
 		)
-		renderContainers := func(containers map[string]*goDocker.Container, infoType DockerInfoType, listOffset int) {
-			names, info := getNameAndInfoOfContainers(containers, listOffset, infoType)
-			var height = len(names) + 2
-			uiView.NameList.Height = height
-			uiView.NameList.Items = names
-			uiView.InfoList.Height = height
-			uiView.InfoList.Items = info
-			uiView.InfoList.Border.Label = InfoHeaders[infoType]
-			uiView.Render()
-		}
 		for {
 			select {
 			case e := <-uiEventChan:
@@ -189,19 +133,23 @@ func main() {
 							if horizPosition > 0 {
 								horizPosition--
 							}
+							uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
 						case ui.KeyArrowRight:
 							if horizPosition < MaxHorizPosition {
 								horizPosition++
 							}
+							uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
 						case ui.KeyArrowDown:
 							if offset < maxOffset && offset < MaxContainers {
 								offset++
 							}
+							uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
 							//shift the list down
 						case ui.KeyArrowUp:
 							if offset > 0 {
 								offset--
 							}
+							uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
 							//shift the list up
 						default:
 							Info.Printf("Got unhandled key %d\n", e.Key)
@@ -214,17 +162,21 @@ func main() {
 				uiView.Render()
 			case cont := <-newContainerChan:
 				Info.Println("Got new containers event")
+				Info.Printf("%d, %d, %d", offset, maxOffset, horizPosition)
 				currentContainers[cont.ID] = cont
 				maxOffset = len(currentContainers) - 1
-
-				renderContainers(currentContainers, DockerInfoType(horizPosition), offset)
+				uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
 
 			case removedContainerID := <-removeContainerChan:
+				maxOffset = len(currentContainers) - 1
+				if offset >= maxOffset {
+					offset = maxOffset
+				}
+				Info.Printf("%d, %d, %d", offset, maxOffset, horizPosition)
 				Info.Println("Got dead container event")
 				delete(currentContainers, removedContainerID)
-				maxOffset = len(currentContainers) - 1
 
-				renderContainers(currentContainers, DockerInfoType(horizPosition), offset)
+				uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
 
 			case newStatsCharts := <-drawStatsChan:
 

@@ -1,7 +1,12 @@
 package main
 
 import (
+	. "./logger"
+	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type DockerInfoType int
@@ -102,4 +107,60 @@ func (v *View) ResetSize() {
 
 func (v *View) Render() {
 	ui.Render(ui.Body)
+}
+
+func (v *View) RenderContainers(containers map[string]*goDocker.Container, infoType DockerInfoType, listOffset int) {
+	names, info := getNameAndInfoOfContainers(containers, listOffset, infoType)
+	var height = len(names) + 2
+	v.NameList.Height = height
+	v.NameList.Items = names
+	v.InfoList.Height = height
+	v.InfoList.Items = info
+	v.InfoList.Border.Label = InfoHeaders[infoType]
+	v.Render()
+}
+
+func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offset int, infoType DockerInfoType) ([]string, []string) {
+	if offset > len(containers) {
+		offset = len(containers) - 1
+	}
+
+	numContainersSubset := len(containers) - offset
+
+	names := make([]string, numContainersSubset)
+	info := make([]string, numContainersSubset)
+
+	containersSorted := mapValuesSorted(containers)
+	for index, cont := range containersSorted {
+		if index < offset {
+			continue
+		}
+
+		names[index-offset] = "(" + strconv.Itoa(index+1) + ") " + cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
+		switch infoType {
+		case ImageInfo:
+			info[index-offset] = cont.Config.Image
+		case PortInfo:
+			info[index-offset] = createPortsString(cont.NetworkSettings.Ports)
+		case BindInfo:
+			info[index-offset] = strings.TrimRight(strings.Join(cont.HostConfig.Binds, ","), ",")
+		case CommandInfo:
+			info[index-offset] = cont.Path + " " + strings.Join(cont.Args, " ")
+		case EnvInfo:
+			info[index-offset] = strings.TrimRight(strings.Join(cont.Config.Env, ","), ",")
+		case EntrypointInfo:
+			info[index-offset] = strings.Join(cont.Config.Entrypoint, " ")
+		case VolumesInfo:
+			volStr := ""
+			for intVol, hostVol := range cont.Volumes {
+				volStr += intVol + ":" + hostVol + ","
+			}
+			info[index-offset] = strings.TrimRight(volStr, ",")
+		case TimeInfo:
+			info[index-offset] = cont.State.StartedAt.Format(time.RubyDate)
+		default:
+			Error.Println("Unhandled info type", infoType)
+		}
+	}
+	return names, info
 }
