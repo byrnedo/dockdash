@@ -1,4 +1,4 @@
-.PHONY: build release docker docker-run
+.PHONY: build release try
 
 ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
