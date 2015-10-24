@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/byrnedo/dockdash/dockerClient"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
 	"io"
@@ -144,28 +143,6 @@ func InitLog(
 		log.Ldate|log.Ltime|log.Lshortfile)
 }
 
-func createCPUGauge() *ui.Gauge {
-	cpuGauge := ui.NewGauge()
-	cpuGauge.Percent = 50
-	cpuGauge.Height = 3
-	cpuGauge.Border.Label = "CPU Usage"
-	cpuGauge.BarColor = ui.ColorRed
-	cpuGauge.Border.FgColor = ui.ColorWhite
-	cpuGauge.Border.LabelFgColor = ui.ColorCyan
-	return cpuGauge
-}
-
-func createMemGauge() *ui.Gauge {
-	memGauge := ui.NewGauge()
-	memGauge.Percent = 50
-	memGauge.Height = 3
-	memGauge.Border.Label = "Mem. Usage"
-	memGauge.BarColor = ui.ColorRed
-	memGauge.Border.FgColor = ui.ColorWhite
-	memGauge.Border.LabelFgColor = ui.ColorCyan
-	return memGauge
-}
-
 func createContainerList() *ui.List {
 	list := ui.NewList()
 	list.ItemFgColor = ui.ColorCyan
@@ -176,7 +153,6 @@ func createContainerList() *ui.List {
 func createDockerLineChart() *ui.LineChart {
 	lc := ui.NewLineChart()
 	lc.Border.Label = "Container Numbers"
-	//lc.Data = sinps
 	lc.Height = 10
 	lc.AxesColor = ui.ColorWhite
 	lc.LineColor = ui.ColorRed | ui.AttrBold
@@ -220,11 +196,11 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 		case PortInfo:
 			info[index-offset] = createPortsString(cont.NetworkSettings.Ports)
 		case BindInfo:
-			info[index-offset] = strings.Join(cont.HostConfig.Binds, ",")
+			info[index-offset] = strings.TrimRight(strings.Join(cont.HostConfig.Binds, ","), ",")
 		case CommandInfo:
 			info[index-offset] = cont.Path + " " + strings.Join(cont.Args, " ")
 		case EnvInfo:
-			info[index-offset] = strings.Join(cont.Config.Env, ",")
+			info[index-offset] = strings.TrimRight(strings.Join(cont.Config.Env, ","), ",")
 		case EntrypointInfo:
 			info[index-offset] = strings.Join(cont.Config.Entrypoint, " ")
 		case VolumesInfo:
@@ -330,7 +306,7 @@ func main() {
 
 	InitLog(ioutil.Discard, file, file, file)
 
-	docker, err := dockerClient.NewDockerClient()
+	docker, err := goDocker.NewClientFromEnv()
 	if err != nil {
 		panic(err)
 	}
