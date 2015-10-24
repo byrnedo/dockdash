@@ -14,13 +14,22 @@ W.I.P right now, please let me know if there's anything you think I should add t
 
 #Getting Started
 
+Try it out first (requires docker...)
+
+    make try
+
+This will mount /var/run/docker.sock straight into the container :)
+
 Check out the [releases](http://github.com/byrnedo/dockdash/releases) page to get binaries. 
 
 If you want for a specific arch just raise a ticket.
 
-Otherwise you can build from source (assumes you have `go` installed):
+Otherwise you can build yourself (requires docker):
+
+    make build
+
+Output binary will be in `build/`
     
-    go get github.com/byrnedo/dockdash
 
 ##Todo
 1. Clean up code.
