@@ -184,8 +184,8 @@ func main() {
 				uiView.CpuChart.DataLabels = newStatsCharts.CpuChart.DataLabels[offset:]
 				uiView.MemChart.Data = newStatsCharts.MemChart.Data[offset:]
 				uiView.MemChart.DataLabels = newStatsCharts.MemChart.DataLabels[offset:]
+			default:
 				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
-					Info.Println("Got draw stats event")
 					uiView.Render()
 					lastStatsRender = time.Now()
 				}

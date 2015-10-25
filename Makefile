@@ -7,7 +7,7 @@ build:
 	docker run --rm -it\
 		-v "$(ROOT_DIR)":/usr/src/github.com/byrnedo/dockdash \
 		-w /usr/src/github.com/byrnedo/dockdash golang:1.5.1 \
-		go get -d -v && go build -v -o build/dockdash main.go 
+		go get -d -v && go build -v -o build/dockdash 
 
 #cross compile 386 and amd64
 release:
@@ -17,7 +17,7 @@ release:
 		-w /usr/src/github.com/byrnedo/dockdash golang:1.5.1 go get -d -v && bash -c \
 		"for linux_arch in 386 amd64; \
 		do \
-		env GOOS=linux GOARCH=\$$linux_arch go build -o build/releases/linux/\$$linux_arch/dockdash main.go && \
+		env GOOS=linux GOARCH=\$$linux_arch go build -o build/releases/linux/\$$linux_arch/dockdash && \
 		(cd build/releases/linux/\$$linux_arch/ && zip ../../dockdash_linux_\$$linux_arch.zip  dockdash); \
 		done;"
 
@@ -26,5 +26,5 @@ try:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v "$(ROOT_DIR)":/usr/src/github.com/byrnedo/dockdash \
 		-w /usr/src/github.com/byrnedo/dockdash golang:1.5.1 \
-		go get -d -v && go build -v -o /tmp/dockdash main.go && /tmp/dockdash
+		go get -d -v && go build -v -o /tmp/dockdash && /tmp/dockdash
 
