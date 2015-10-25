@@ -1,7 +1,7 @@
 package docklistener
 
 import (
-	. "../logger"
+	. "github.com/byrnedo/dockdash/logger"
 	goDocker "github.com/fsouza/go-dockerclient"
 	"sort"
 	"strconv"

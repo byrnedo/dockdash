@@ -1,7 +1,7 @@
 package main
 
 import (
-	. "./logger"
+	. "github.com/byrnedo/dockdash/logger"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
 	"strconv"

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"./docklistener"
-	. "./logger"
+	"github.com/byrnedo/dockdash/docklistener"
+	. "github.com/byrnedo/dockdash/logger"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
 	"io/ioutil"
