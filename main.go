@@ -37,20 +37,11 @@ func (p ContainerSlice) Swap(i, j int) {
 }
 
 var (
-	newContainerChan     = make(chan *goDocker.Container)
-	removeContainerChan  = make(chan string)
-	listStartOffsetChan  = make(chan int)
-	horizPositionChan    = make(chan int)
-	maxOffsetChan        = make(chan int)
-	deadContainerChan    = make(chan string)
-	startedContainerChan = make(chan string)
-	doneChan             = make(chan bool)
-	uiEventChan          = ui.EventCh()
-	drawContainersChan   = make(chan *ContainersMsg)
-	drawStatsChan        = make(chan *docklistener.StatsMsg)
-
-	startGatheringStatisticsChan = make(chan *goDocker.Container)
-	stopGatheringStatisticsChan  = make(chan string)
+	newContainerChan    = make(chan *goDocker.Container)
+	removeContainerChan = make(chan string)
+	doneChan            = make(chan bool)
+	uiEventChan         = ui.EventCh()
+	drawStatsChan       = make(chan *docklistener.StatsMsg)
 )
 
 func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted ContainerSlice) {
