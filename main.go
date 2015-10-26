@@ -194,10 +194,10 @@ func main() {
 	}
 	go uiRoutine()
 
-	docklistener.Init(docker, newContainerChan, removeContainerChan, drawStatsChan)
-
 	//setup initial containers
 	uiView.Render()
+
+	docklistener.Init(docker, newContainerChan, removeContainerChan, drawStatsChan)
 
 	<-doneChan
 
