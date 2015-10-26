@@ -37,11 +37,11 @@ func (p ContainerSlice) Swap(i, j int) {
 }
 
 var (
-	newContainerChan    = make(chan *goDocker.Container)
-	removeContainerChan = make(chan string)
-	doneChan            = make(chan bool)
-	uiEventChan         = ui.EventCh()
-	drawStatsChan       = make(chan *docklistener.StatsMsg)
+	newContainerChan    chan *goDocker.Container
+	removeContainerChan chan string
+	doneChan            chan bool
+	uiEventChan         <-chan ui.Event
+	drawStatsChan       chan *docklistener.StatsMsg
 )
 
 func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted ContainerSlice) {
@@ -96,7 +96,11 @@ func main() {
 
 	uiView.Align()
 
-	docklistener.Init(docker, newContainerChan, removeContainerChan, drawStatsChan)
+	newContainerChan = make(chan *goDocker.Container)
+	removeContainerChan = make(chan string)
+	doneChan = make(chan bool)
+	uiEventChan = ui.EventCh()
+	drawStatsChan = make(chan *docklistener.StatsMsg)
 
 	// Statistics
 
@@ -184,6 +188,8 @@ func main() {
 		}
 	}
 	go uiRoutine()
+
+	docklistener.Init(docker, newContainerChan, removeContainerChan, drawStatsChan)
 
 	//setup initial containers
 	uiView.Render()

@@ -64,6 +64,7 @@ func Init(docker *goDocker.Client, newContChan chan<- *goDocker.Container, remov
 	containers, _ := dockerClient.ListContainers(goDocker.ListContainersOptions{})
 	Info.Println("Listing intial", len(containers), "containers as started")
 	for _, cont := range containers {
+		Info.Println("Marking", cont.ID, "as started")
 		dockerEventChan <- &goDocker.APIEvents{ID: cont.ID, Status: "start"}
 		//startedContainerChan <- cont.ID
 	}
@@ -96,6 +97,7 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 		case e := <-eventChan:
 			switch e.Status {
 			case "start":
+				Info.Println(e.ID, "started")
 				cont, err := dockerClient.InspectContainer(e.ID)
 				if err != nil {
 					Error.Println("Failed to inspect new container", e.ID, ":", err)
