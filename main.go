@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"github.com/byrnedo/dockdash/docklistener"
 	. "github.com/byrnedo/dockdash/logger"
 	goDocker "github.com/fsouza/go-dockerclient"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"time"
 )
+
+var logFile = flag.String("log-file", "", "Path to log file")
 
 type ListData struct {
 	Label string
@@ -70,13 +73,15 @@ func createPortsString(ports map[goDocker.Port][]goDocker.PortBinding) (portsStr
 }
 
 func main() {
-	var logPath = "/tmp/dockdash.log"
-	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		panic("Failed to open log file " + logPath + ":" + err.Error())
+	if len(*logFile) > 0 {
+		file, err := os.OpenFile(*logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			panic("Failed to open log file " + *logFile + ":" + err.Error())
+		}
+		InitLog(ioutil.Discard, file, file, file)
+	} else {
+		InitLog(ioutil.Discard, ioutil.Discard, ioutil.Discard, ioutil.Discard)
 	}
-
-	InitLog(ioutil.Discard, file, file, file)
 
 	docker, err := goDocker.NewClientFromEnv()
 	if err != nil {
