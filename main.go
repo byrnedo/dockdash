@@ -1,19 +1,18 @@
 package main
 
 import (
-	"flag"
+	"fmt"
 	"github.com/byrnedo/dockdash/docklistener"
 	. "github.com/byrnedo/dockdash/logger"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
+	flag "github.com/ogier/pflag"
 	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
 	"time"
 )
-
-var logFile = flag.String("log-file", "", "Path to log file")
 
 type ListData struct {
 	Label string
@@ -72,18 +71,37 @@ func createPortsString(ports map[goDocker.Port][]goDocker.PortBinding) (portsStr
 	return strings.TrimRight(portsStr, ",")
 }
 
+var logFileFlag = flag.String("log-file", "", "Path to log file")
+var dockerEndpoint = flag.String("docker-endpoint", "unix:/var/run/docker.sock", "Docker connection endpoint")
+var helpFlag = flag.Bool("help", false, "help")
+
+func init() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: dockdash [options]\n\n")
+		flag.PrintDefaults()
+	}
+
+	flag.Parse()
+
+	if *helpFlag {
+		flag.Usage()
+		os.Exit(1)
+	}
+}
+
 func main() {
-	if len(*logFile) > 0 {
-		file, err := os.OpenFile(*logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+
+	if len(*logFileFlag) > 0 {
+		file, err := os.OpenFile(*logFileFlag, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
-			panic("Failed to open log file " + *logFile + ":" + err.Error())
+			panic("Failed to open log file " + *logFileFlag + ":" + err.Error())
 		}
 		InitLog(ioutil.Discard, file, file, file)
 	} else {
 		InitLog(ioutil.Discard, ioutil.Discard, ioutil.Discard, ioutil.Discard)
 	}
 
-	docker, err := goDocker.NewClientFromEnv()
+	docker, err := goDocker.NewClient(*dockerEndpoint)
 	if err != nil {
 		panic(err)
 	}

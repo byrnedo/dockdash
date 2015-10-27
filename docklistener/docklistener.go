@@ -8,8 +8,8 @@ import (
 )
 
 type StatsResult struct {
-	Container *goDocker.Container
-	Stats     *goDocker.Stats
+	Container goDocker.Container
+	Stats     goDocker.Stats
 }
 
 type StatsResultSlice []*StatsResult
@@ -113,7 +113,7 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 					for {
 						select {
 						case stat := <-startsResultInterceptChannels[cont.ID]:
-							statsResultsChan <- &StatsResult{cont, stat}
+							statsResultsChan <- &StatsResult{*cont, *stat}
 						case _ = <-startsResultInterceptDoneChannels[cont.ID]:
 							return
 						}
@@ -188,7 +188,7 @@ func updateStatsBarCharts(statsList map[string]*StatsResult) (statsCpuChart *Cha
 
 	for count, stats := range orderedList {
 		statsCpuChart.DataLabels[count] = strconv.Itoa(count + 1)
-		statsCpuChart.Data[count] = int(calculateCPUPercent(stats.Stats))
+		statsCpuChart.Data[count] = int(calculateCPUPercent(&stats.Stats))
 
 		statsMemChart.DataLabels[count] = strconv.Itoa(count + 1)
 		if stats.Stats.MemoryStats.Limit != 0 {
