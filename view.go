@@ -4,6 +4,7 @@ import (
 	. "github.com/byrnedo/dockdash/logger"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -163,4 +164,16 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 		}
 	}
 	return names, info
+}
+
+func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted ContainerSlice) {
+
+	sorted = make(ContainerSlice, len(mapToSort))
+	var i = 0
+	for _, val := range mapToSort {
+		sorted[i] = val
+		i++
+	}
+	sort.Sort(sorted)
+	return
 }

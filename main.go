@@ -9,7 +9,6 @@ import (
 	flag "github.com/ogier/pflag"
 	"io/ioutil"
 	"os"
-	"sort"
 	"strings"
 	"time"
 )
@@ -45,18 +44,6 @@ var (
 	uiEventChan         <-chan ui.Event
 	drawStatsChan       chan *docklistener.StatsMsg
 )
-
-func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted ContainerSlice) {
-
-	sorted = make(ContainerSlice, len(mapToSort))
-	var i = 0
-	for _, val := range mapToSort {
-		sorted[i] = val
-		i++
-	}
-	sort.Sort(sorted)
-	return
-}
 
 func createPortsString(ports map[goDocker.Port][]goDocker.PortBinding) (portsStr string) {
 
@@ -176,8 +163,8 @@ func main() {
 				}
 				if e.Type == ui.EventResize {
 					uiView.ResetSize()
+					uiView.Render()
 				}
-				uiView.Render()
 			case cont := <-newContainerChan:
 				Info.Println("Got new containers event")
 				Info.Printf("%d, %d, %d", offset, maxOffset, horizPosition)
@@ -197,13 +184,11 @@ func main() {
 				uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
 
 			case newStatsCharts := <-drawStatsChan:
-
-				uiView.CpuChart.Data = newStatsCharts.CpuChart.Data[offset:]
-				uiView.CpuChart.DataLabels = newStatsCharts.CpuChart.DataLabels[offset:]
-				uiView.MemChart.Data = newStatsCharts.MemChart.Data[offset:]
-				uiView.MemChart.DataLabels = newStatsCharts.MemChart.DataLabels[offset:]
-			default:
 				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
+					uiView.CpuChart.Data = newStatsCharts.CpuChart.Data[offset:]
+					uiView.CpuChart.DataLabels = newStatsCharts.CpuChart.DataLabels[offset:]
+					uiView.MemChart.Data = newStatsCharts.MemChart.Data[offset:]
+					uiView.MemChart.DataLabels = newStatsCharts.MemChart.DataLabels[offset:]
 					uiView.Render()
 					lastStatsRender = time.Now()
 				}
