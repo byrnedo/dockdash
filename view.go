@@ -4,6 +4,7 @@ import (
 	. "github.com/byrnedo/dockdash/logger"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -125,42 +126,57 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 		offset = len(containers) - 1
 	}
 
-	numContainersSubset := len(containers) - offset
-
-	names := make([]string, numContainersSubset)
-	info := make([]string, numContainersSubset)
-
-	containersSorted := mapValuesSorted(containers)
-	for index, cont := range containersSorted {
+	var (
+		numContainersSubset = len(containers) - offset
+		names               = make([]string, numContainersSubset)
+		info                = make([]string, numContainersSubset)
+		containersSorted    = mapValuesSorted(containers)
+		count               = 0
+	)
+	for index := len(containersSorted) - 1; index >= 0; index-- {
 		if index < offset {
 			continue
 		}
+		var cont = containersSorted[index]
 
-		names[index-offset] = "(" + strconv.Itoa(index+1) + ") " + cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
+		names[count] = "(" + strconv.Itoa(index+1) + ") " + cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
 		switch infoType {
 		case ImageInfo:
-			info[index-offset] = cont.Config.Image
+			info[count] = cont.Config.Image
 		case PortInfo:
-			info[index-offset] = createPortsString(cont.NetworkSettings.Ports)
+			info[count] = createPortsString(cont.NetworkSettings.Ports)
 		case BindInfo:
-			info[index-offset] = strings.TrimRight(strings.Join(cont.HostConfig.Binds, ","), ",")
+			info[count] = strings.TrimRight(strings.Join(cont.HostConfig.Binds, ","), ",")
 		case CommandInfo:
-			info[index-offset] = cont.Path + " " + strings.Join(cont.Args, " ")
+			info[count] = cont.Path + " " + strings.Join(cont.Args, " ")
 		case EnvInfo:
-			info[index-offset] = strings.TrimRight(strings.Join(cont.Config.Env, ","), ",")
+			info[count] = strings.TrimRight(strings.Join(cont.Config.Env, ","), ",")
 		case EntrypointInfo:
-			info[index-offset] = strings.Join(cont.Config.Entrypoint, " ")
+			info[count] = strings.Join(cont.Config.Entrypoint, " ")
 		case VolumesInfo:
 			volStr := ""
 			for intVol, hostVol := range cont.Volumes {
 				volStr += intVol + ":" + hostVol + ","
 			}
-			info[index-offset] = strings.TrimRight(volStr, ",")
+			info[count] = strings.TrimRight(volStr, ",")
 		case TimeInfo:
-			info[index-offset] = cont.State.StartedAt.Format(time.RubyDate)
+			info[count] = cont.State.StartedAt.Format(time.RubyDate)
 		default:
 			Error.Println("Unhandled info type", infoType)
 		}
+		count++
 	}
 	return names, info
+}
+
+func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted ContainerSlice) {
+
+	sorted = make(ContainerSlice, len(mapToSort))
+	var i = 0
+	for _, val := range mapToSort {
+		sorted[i] = val
+		i++
+	}
+	sort.Sort(sorted)
+	return
 }
