@@ -10,7 +10,7 @@ import (
 	flag "github.com/ogier/pflag"
 	"io/ioutil"
 	"os"
-	"time"
+	//"time"
 )
 
 type ListData struct {
@@ -89,11 +89,11 @@ func main() {
 
 	uiRoutine := func() {
 		var (
-			horizPosition     int       = 0
-			offset            int       = 0
-			maxOffset         int       = 0
-			lastStatsRender   time.Time = time.Time{}
-			currentContainers           = make(map[string]*goDocker.Container)
+			horizPosition int = 0
+			offset        int = 0
+			maxOffset     int = 0
+			//lastStatsRender   time.Time = time.Time{}
+			currentContainers = make(map[string]*goDocker.Container)
 		)
 		for {
 			select {
@@ -157,10 +157,10 @@ func main() {
 				uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
 
 			case newStatsCharts := <-drawStatsChan:
-				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
-					uiView.RenderStats(newStatsCharts, offset)
-					lastStatsRender = time.Now()
-				}
+				//				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
+				uiView.RenderStats(newStatsCharts, offset)
+				//					lastStatsRender = time.Now()
+				//				}
 			}
 		}
 	}

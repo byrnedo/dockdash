@@ -39,6 +39,7 @@ const MaxContainers = 1000
 const MaxHorizPosition = int(TimeInfo)
 
 type View struct {
+	Header   *ui.Par
 	CpuChart *ui.BarChart
 	MemChart *ui.BarChart
 	NameList *ui.List
@@ -48,6 +49,7 @@ type View struct {
 func createContainerList() *ui.List {
 	list := ui.NewList()
 	list.ItemFgColor = ui.ColorCyan
+	list.Border.FgColor = ui.ColorBlack
 	list.HasBorder = true
 	return list
 }
@@ -79,6 +81,12 @@ func createDockerLineChart() *ui.LineChart {
 func NewView() *View {
 
 	var view = View{}
+
+	view.Header = ui.NewPar("Containers")
+	view.Header.HasBorder = false
+	view.Header.Text = " Dockdash - Interactive realtime container inspector"
+	view.Header.Height = 3
+
 	view.NameList = createContainerList()
 	view.NameList.Border.Label = "Name"
 
@@ -88,17 +96,22 @@ func NewView() *View {
 	view.CpuChart = ui.NewBarChart()
 	view.CpuChart.HasBorder = true
 	view.CpuChart.Border.Label = "%CPU"
-	view.CpuChart.Height = 10
+	view.CpuChart.Border.FgColor = ui.ColorBlack
+	view.CpuChart.Height = 8
 
 	view.MemChart = ui.NewBarChart()
 	view.MemChart.HasBorder = true
 	view.MemChart.Border.Label = "%MEM"
-	view.MemChart.Height = 10
+	view.MemChart.Border.FgColor = ui.ColorBlack
+	view.MemChart.Height = 8
 	return &view
 }
 
 func (v *View) SetLayout() {
 	ui.Body.AddRows(
+		ui.NewRow(
+			ui.NewCol(12, 0, v.Header),
+		),
 		ui.NewRow(
 			ui.NewCol(12, 0, v.CpuChart),
 		),

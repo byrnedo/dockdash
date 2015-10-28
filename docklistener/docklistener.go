@@ -104,6 +104,7 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 					continue
 				}
 				newContainerChan <- cont
+				statsResultsChan <- &StatsResult{*cont, goDocker.Stats{}}
 
 				statsDoneChannels[cont.ID] = make(chan bool, 1)
 				startsResultInterceptChannels[cont.ID] = make(chan *goDocker.Stats)
@@ -132,6 +133,7 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 				go spinOffStatsListener()
 			case "die":
 				removeContainerChan <- e.ID
+				statsResultsDoneChan <- e.ID
 
 				Info.Println("Stopping stats routine for", e.ID)
 				statsDoneChannels[e.ID] <- true
