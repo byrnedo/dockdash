@@ -1,0 +1,31 @@
+{
+	"ImportPath": "github.com/byrnedo/dockdash",
+	"GoVersion": "go1.5.1",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/fsouza/go-dockerclient",
+			"Rev": "09604abc82243886001c3f56fd709d4ba603cead"
+		},
+		{
+			"ImportPath": "github.com/gizak/termui",
+			"Rev": "83e27ff60c3c9c8bdd2437239e2ec32a20fef646"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-runewidth",
+			"Comment": "travisish-37-g12e0ff7",
+			"Rev": "12e0ff74603c9a3209d8bf84f8ab349fe1ad9477"
+		},
+		{
+			"ImportPath": "github.com/nsf/termbox-go",
+			"Rev": "4f9984b1541648f3a03da24e0f5987fd1c64247d"
+		},
+		{
+			"ImportPath": "github.com/ogier/pflag",
+			"Comment": "v0.0.1-4-g6f7159c",
+			"Rev": "6f7159c3154e7cd4ab30f6cc9c58fa3fd0f22325"
+		}
+	]
+}
