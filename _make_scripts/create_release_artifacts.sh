@@ -17,6 +17,20 @@ do
     mkdir -p build/releases/${pkg_name}/usr/local/bin
     mv  build/releases/${pkg_name}/dockdash  build/releases/${pkg_name}/usr/local/bin/dockdash
     mkdir -p build/releases/${pkg_name}/DEBIAN
+    cat << EOF > build/releases/${pkg_name}/DEBIAN/postinst
+#!/bin/sh
+set -e
+echo 'Installed dockdash'
+EOF
+    chmod +x build/releases/${pkg_name}/DEBIAN/postinst
+
+    cat << EOF > build/releases/${pkg_name}/DEBIAN/prerem
+#!/bin/sh
+set -e
+echo 'Removing dockdash...'
+EOF
+    chmod +x build/releases/${pkg_name}/DEBIAN/prerem
+
     cat << EOF >  build/releases/${pkg_name}/DEBIAN/control
 Package: dockdash
 Version: $version
