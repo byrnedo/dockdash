@@ -12,7 +12,7 @@ prepare-release:
 	go get -d -v && bash _make_scripts/create_release_artifacts.sh
 
 release:
-	go get -d -v && bash _make_scripts/release.sh
+	go get -d -v && bash _make_scripts/release.sh $(RELEASE_VERSION)
 
 d-build:
 	mkdir -p $(ROOT_DIR)/build && \
