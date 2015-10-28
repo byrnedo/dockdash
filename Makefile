@@ -7,9 +7,12 @@ RELEASE_VERSION:=
 
 build:
 	go get -d -v && go build -v -o build/dockdash
+
+prepare-release:
+	go get -d -v && bash _make_scripts/create_release_artifacts.sh
+
 release:
-	go get -d -v && bash _make_scripts/create_release.sh
-git-release: release
+	go get -d -v && bash _make_scripts/release.sh
 
 d-build:
 	mkdir -p $(ROOT_DIR)/build && \
@@ -17,13 +20,6 @@ d-build:
 		-v "$(ROOT_DIR)":/usr/src/$(REPO_PATH)\
 		-w /usr/src/$(REPO_PATH) $(GO_IMAGE) \
 		go get -d -v && go build -v -o build/dockdash
-
-#cross compile 386 and amd64
-d-release:
-	mkdir -p build/releases && \
-	docker run --rm -it\
-		-v "$(ROOT_DIR)":/usr/src/$(REPO_PATH) \
-		-w /usr/src/$(REPO_PATH) $(GO_IMAGE) go get -d -v && bash do_release.sh
 
 try:
 	docker run --rm -it\
