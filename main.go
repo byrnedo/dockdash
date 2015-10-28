@@ -185,11 +185,7 @@ func main() {
 
 			case newStatsCharts := <-drawStatsChan:
 				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
-					uiView.CpuChart.Data = newStatsCharts.CpuChart.Data[offset:]
-					uiView.CpuChart.DataLabels = newStatsCharts.CpuChart.DataLabels[offset:]
-					uiView.MemChart.Data = newStatsCharts.MemChart.Data[offset:]
-					uiView.MemChart.DataLabels = newStatsCharts.MemChart.DataLabels[offset:]
-					uiView.Render()
+					uiView.RenderStats(newStatsCharts, offset)
 					lastStatsRender = time.Now()
 				}
 			}

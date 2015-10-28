@@ -1,6 +1,7 @@
 package main
 
 import (
+	docklistener "github.com/byrnedo/dockdash/docklistener"
 	. "github.com/byrnedo/dockdash/logger"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
@@ -108,6 +109,14 @@ func (v *View) ResetSize() {
 
 func (v *View) Render() {
 	ui.Render(ui.Body)
+}
+
+func (v *View) RenderStats(statsCharts *docklistener.StatsMsg, offset int) {
+	v.CpuChart.Data = statsCharts.CpuChart.Data[offset:]
+	v.CpuChart.DataLabels = statsCharts.CpuChart.DataLabels[offset:]
+	v.MemChart.Data = statsCharts.MemChart.Data[offset:]
+	v.MemChart.DataLabels = statsCharts.MemChart.DataLabels[offset:]
+	v.Render()
 }
 
 func (v *View) RenderContainers(containers map[string]*goDocker.Container, infoType DockerInfoType, listOffset int) {
