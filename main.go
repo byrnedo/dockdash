@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"github.com/byrnedo/dockdash/docklistener"
 	. "github.com/byrnedo/dockdash/logger"
+	view "github.com/byrnedo/dockdash/view"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
 	flag "github.com/ogier/pflag"
 	"io/ioutil"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -23,20 +23,6 @@ type ContainersMsg struct {
 	Right *ListData
 }
 
-type ContainerSlice []*goDocker.Container
-
-func (p ContainerSlice) Len() int {
-	return len(p)
-}
-
-func (p ContainerSlice) Less(i, j int) bool {
-	return p[i].State.StartedAt.After(p[j].State.StartedAt)
-}
-
-func (p ContainerSlice) Swap(i, j int) {
-	p[i], p[j] = p[j], p[i]
-}
-
 var (
 	newContainerChan    chan *goDocker.Container
 	removeContainerChan chan string
@@ -44,19 +30,6 @@ var (
 	uiEventChan         <-chan ui.Event
 	drawStatsChan       chan *docklistener.StatsMsg
 )
-
-func createPortsString(ports map[goDocker.Port][]goDocker.PortBinding) (portsStr string) {
-
-	for intPort, extHostPortList := range ports {
-		if len(extHostPortList) == 0 {
-			portsStr += intPort.Port() + "->N/A,"
-		}
-		for _, extHostPort := range extHostPortList {
-			portsStr += intPort.Port() + "->" + extHostPort.HostIP + ":" + extHostPort.HostPort + ","
-		}
-	}
-	return strings.TrimRight(portsStr, ",")
-}
 
 var logFileFlag = flag.String("log-file", "", "Path to log file")
 var dockerEndpoint = flag.String("docker-endpoint", "unix:/var/run/docker.sock", "Docker connection endpoint")
@@ -100,7 +73,7 @@ func main() {
 
 	defer ui.Close()
 
-	var uiView = NewView()
+	var uiView = view.NewView()
 
 	uiView.SetLayout()
 
@@ -138,23 +111,23 @@ func main() {
 							if horizPosition > 0 {
 								horizPosition--
 							}
-							uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
+							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
 						case ui.KeyArrowRight:
-							if horizPosition < MaxHorizPosition {
+							if horizPosition < view.MaxHorizPosition {
 								horizPosition++
 							}
-							uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
+							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
 						case ui.KeyArrowDown:
-							if offset < maxOffset && offset < MaxContainers {
+							if offset < maxOffset && offset < view.MaxContainers {
 								offset++
 							}
-							uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
+							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
 							//shift the list down
 						case ui.KeyArrowUp:
 							if offset > 0 {
 								offset--
 							}
-							uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
+							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
 							//shift the list up
 						default:
 							Info.Printf("Got unhandled key %d\n", e.Key)
@@ -170,7 +143,7 @@ func main() {
 				Info.Printf("%d, %d, %d", offset, maxOffset, horizPosition)
 				currentContainers[cont.ID] = cont
 				maxOffset = len(currentContainers) - 1
-				uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
+				uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
 
 			case removedContainerID := <-removeContainerChan:
 				maxOffset = len(currentContainers) - 1
@@ -181,7 +154,7 @@ func main() {
 				Info.Println("Got dead container event")
 				delete(currentContainers, removedContainerID)
 
-				uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset)
+				uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
 
 			case newStatsCharts := <-drawStatsChan:
 				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {

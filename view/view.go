@@ -1,4 +1,4 @@
-package main
+package view
 
 import (
 	docklistener "github.com/byrnedo/dockdash/docklistener"
@@ -50,6 +50,20 @@ func createContainerList() *ui.List {
 	list.ItemFgColor = ui.ColorCyan
 	list.HasBorder = true
 	return list
+}
+
+type ContainerSlice []*goDocker.Container
+
+func (p ContainerSlice) Len() int {
+	return len(p)
+}
+
+func (p ContainerSlice) Less(i, j int) bool {
+	return p[i].State.StartedAt.After(p[j].State.StartedAt)
+}
+
+func (p ContainerSlice) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
 }
 
 func createDockerLineChart() *ui.LineChart {
@@ -188,4 +202,17 @@ func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted Container
 	}
 	sort.Sort(sorted)
 	return
+}
+
+func createPortsString(ports map[goDocker.Port][]goDocker.PortBinding) (portsStr string) {
+
+	for intPort, extHostPortList := range ports {
+		if len(extHostPortList) == 0 {
+			portsStr += intPort.Port() + "->N/A,"
+		}
+		for _, extHostPort := range extHostPortList {
+			portsStr += intPort.Port() + "->" + extHostPort.HostIP + ":" + extHostPort.HostPort + ","
+		}
+	}
+	return strings.TrimRight(portsStr, ",")
 }
