@@ -1,7 +1,11 @@
 #!/bin/bash
 set -ueo pipefail
+SCRIPT=`realpath $0`
+SCRIPT_PATH=`dirname $SCRIPT`
 
 version=$(git describe --tag)
+
+cd $SCRIPT_PATH/..
 
 for linux_arch in 386 amd64
 do

@@ -3,12 +3,13 @@
 ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 REPO_PATH:=github.com/byrnedo/dockdash
 GO_IMAGE:=golang:1.5.1
-
+RELEASE_VERSION:=
 
 build:
 	go get -d -v && go build -v -o build/dockdash
 release:
-	go get -d -v && bash do_release.sh
+	go get -d -v && bash _make_scripts/create_release.sh
+git-release: release
 
 d-build:
 	mkdir -p $(ROOT_DIR)/build && \
