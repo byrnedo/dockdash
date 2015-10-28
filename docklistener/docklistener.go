@@ -19,7 +19,7 @@ func (p StatsResultSlice) Len() int {
 }
 
 func (p StatsResultSlice) Less(i, j int) bool {
-	return p[i].Container.State.StartedAt.Before(p[j].Container.State.StartedAt)
+	return p[i].Container.State.StartedAt.After(p[j].Container.State.StartedAt)
 }
 
 func (p StatsResultSlice) Swap(i, j int) {
@@ -166,10 +166,9 @@ func updateStatsBarCharts(statsList map[string]*StatsResult) (statsCpuChart *Cha
 	statsCpuChart = &ChartData{}
 	statsMemChart = &ChartData{}
 
-	var statsListLen = len(statsList)
-
 	var (
-		orderedList = make(StatsResultSlice, statsListLen)
+		statsListLen = len(statsList)
+		orderedList  = make(StatsResultSlice, statsListLen)
 	)
 
 	statsCpuChart.DataLabels = make([]string, statsListLen)
@@ -187,10 +186,10 @@ func updateStatsBarCharts(statsList map[string]*StatsResult) (statsCpuChart *Cha
 	sort.Sort(orderedList)
 
 	for count, stats := range orderedList {
-		statsCpuChart.DataLabels[count] = strconv.Itoa(count + 1)
+		statsCpuChart.DataLabels[count] = strconv.Itoa(statsListLen - count)
 		statsCpuChart.Data[count] = int(calculateCPUPercent(&stats.Stats))
 
-		statsMemChart.DataLabels[count] = strconv.Itoa(count + 1)
+		statsMemChart.DataLabels[count] = strconv.Itoa(statsListLen - count)
 		if stats.Stats.MemoryStats.Limit != 0 {
 			statsMemChart.Data[count] = int(float64(stats.Stats.MemoryStats.Usage) / float64(stats.Stats.MemoryStats.Limit) * 100)
 		} else {

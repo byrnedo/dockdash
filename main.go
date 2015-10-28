@@ -30,7 +30,7 @@ func (p ContainerSlice) Len() int {
 }
 
 func (p ContainerSlice) Less(i, j int) bool {
-	return p[i].State.StartedAt.Before(p[j].State.StartedAt)
+	return p[i].State.StartedAt.After(p[j].State.StartedAt)
 }
 
 func (p ContainerSlice) Swap(i, j int) {

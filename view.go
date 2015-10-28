@@ -122,49 +122,49 @@ func (v *View) RenderContainers(containers map[string]*goDocker.Container, infoT
 }
 
 func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offset int, infoType DockerInfoType) ([]string, []string) {
-	if offset > len(containers) {
-		offset = len(containers) - 1
+	var numContainers = len(containers)
+	if offset > numContainers {
+		offset = numContainers - 1
 	}
 
 	var (
-		numContainersSubset = len(containers) - offset
+		numContainersSubset = numContainers - offset
 		names               = make([]string, numContainersSubset)
 		info                = make([]string, numContainersSubset)
 		containersSorted    = mapValuesSorted(containers)
-		count               = 0
 	)
-	for index := len(containersSorted) - 1; index >= 0; index-- {
+	for index, cont := range containersSorted {
 		if index < offset {
 			continue
 		}
-		var cont = containersSorted[index]
 
-		names[count] = "(" + strconv.Itoa(index+1) + ") " + cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
+		var containerNumber = numContainers - index
+
+		names[index-offset] = "(" + strconv.Itoa(containerNumber) + ") " + cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
 		switch infoType {
 		case ImageInfo:
-			info[count] = cont.Config.Image
+			info[index-offset] = cont.Config.Image
 		case PortInfo:
-			info[count] = createPortsString(cont.NetworkSettings.Ports)
+			info[index-offset] = createPortsString(cont.NetworkSettings.Ports)
 		case BindInfo:
-			info[count] = strings.TrimRight(strings.Join(cont.HostConfig.Binds, ","), ",")
+			info[index-offset] = strings.TrimRight(strings.Join(cont.HostConfig.Binds, ","), ",")
 		case CommandInfo:
-			info[count] = cont.Path + " " + strings.Join(cont.Args, " ")
+			info[index-offset] = cont.Path + " " + strings.Join(cont.Args, " ")
 		case EnvInfo:
-			info[count] = strings.TrimRight(strings.Join(cont.Config.Env, ","), ",")
+			info[index-offset] = strings.TrimRight(strings.Join(cont.Config.Env, ","), ",")
 		case EntrypointInfo:
-			info[count] = strings.Join(cont.Config.Entrypoint, " ")
+			info[index-offset] = strings.Join(cont.Config.Entrypoint, " ")
 		case VolumesInfo:
 			volStr := ""
 			for intVol, hostVol := range cont.Volumes {
 				volStr += intVol + ":" + hostVol + ","
 			}
-			info[count] = strings.TrimRight(volStr, ",")
+			info[index-offset] = strings.TrimRight(volStr, ",")
 		case TimeInfo:
-			info[count] = cont.State.StartedAt.Format(time.RubyDate)
+			info[index-offset] = cont.State.StartedAt.Format(time.RubyDate)
 		default:
 			Error.Println("Unhandled info type", infoType)
 		}
-		count++
 	}
 	return names, info
 }
