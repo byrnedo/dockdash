@@ -9,6 +9,12 @@ then
 fi
 RELEASE_VERSION=$1
 
+if GIT_DIR=$SCRIPT_PATH/../.git git rev-parse $RELEASE_VERSION >/dev/null 2>&1
+then
+    >&2 echo tag $RELEASE_VERSION already exists
+    exit 1
+fi
+
 rm -rf ../build
 
 github-release release \
