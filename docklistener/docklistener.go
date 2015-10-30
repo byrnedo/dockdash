@@ -40,14 +40,14 @@ var (
 	dockerEventChan chan *goDocker.APIEvents
 	dockerClient    *goDocker.Client
 
-	statsResultsChan     chan *StatsResult
+	statsResultsChan     chan StatsResult
 	statsResultsDoneChan chan string
 )
 
-func Init(docker *goDocker.Client, newContChan chan<- *goDocker.Container, removeContChan chan<- string, drawStatsChan chan<- *StatsMsg) {
+func Init(docker *goDocker.Client, newContChan chan<- goDocker.Container, removeContChan chan<- string, drawStatsChan chan<- StatsMsg) {
 
 	dockerEventChan = make(chan *goDocker.APIEvents, 10)
-	statsResultsChan = make(chan *StatsResult)
+	statsResultsChan = make(chan StatsResult)
 	statsResultsDoneChan = make(chan string)
 
 	dockerClient = docker
@@ -77,7 +77,7 @@ func Close() {
 	}
 }
 
-func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContainerChan chan<- *goDocker.Container, removeContainerChan chan<- string) {
+func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContainerChan chan<- goDocker.Container, removeContainerChan chan<- string) {
 	var (
 		statsDoneChannels                 = make(map[string]chan bool)
 		startsResultInterceptChannels     = make(map[string]chan *goDocker.Stats)
@@ -103,8 +103,8 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 					Error.Println("Failed to inspect new container", e.ID, ":", err)
 					continue
 				}
-				newContainerChan <- cont
-				statsResultsChan <- &StatsResult{*cont, goDocker.Stats{}}
+				newContainerChan <- *cont
+				statsResultsChan <- StatsResult{*cont, goDocker.Stats{}}
 
 				statsDoneChannels[cont.ID] = make(chan bool, 1)
 				startsResultInterceptChannels[cont.ID] = make(chan *goDocker.Stats)
@@ -114,7 +114,7 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 					for {
 						select {
 						case stat := <-startsResultInterceptChannels[cont.ID]:
-							statsResultsChan <- &StatsResult{*cont, *stat}
+							statsResultsChan <- StatsResult{*cont, *stat}
 						case _ = <-startsResultInterceptDoneChannels[cont.ID]:
 							return
 						}
@@ -144,7 +144,7 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 	}
 }
 
-func statsRenderingRoutine(drawStatsChan chan<- *StatsMsg) {
+func statsRenderingRoutine(drawStatsChan chan<- StatsMsg) {
 
 	var (
 		statsList = make(map[string]*StatsResult)
@@ -153,13 +153,13 @@ func statsRenderingRoutine(drawStatsChan chan<- *StatsMsg) {
 	for {
 		select {
 		case msg := <-statsResultsChan:
-			statsList[msg.Container.ID] = msg
+			statsList[msg.Container.ID] = &msg
 			statsCpuChart, statsMemChart := updateStatsBarCharts(statsList)
-			drawStatsChan <- &StatsMsg{statsCpuChart, statsMemChart}
+			drawStatsChan <- StatsMsg{statsCpuChart, statsMemChart}
 		case id := <-statsResultsDoneChan:
 			delete(statsList, id)
 			statsCpuChart, statsMemChart := updateStatsBarCharts(statsList)
-			drawStatsChan <- &StatsMsg{statsCpuChart, statsMemChart}
+			drawStatsChan <- StatsMsg{statsCpuChart, statsMemChart}
 		}
 	}
 }

@@ -191,7 +191,7 @@ func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offse
 
 		var containerNumber = numContainers - index
 
-		names[index-offset] = "[" + strconv.Itoa(containerNumber) + ". " + cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/](fg-black,bg-white)")
+		names[index-offset] = strconv.Itoa(containerNumber) + ". " + cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
 		switch infoType {
 		case ImageInfo:
 			info[index-offset] = cont.Config.Image
