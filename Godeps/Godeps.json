@@ -11,7 +11,7 @@
 		},
 		{
 			"ImportPath": "github.com/gizak/termui",
-			"Rev": "83e27ff60c3c9c8bdd2437239e2ec32a20fef646"
+			"Rev": "a302a528a807232d794aabb0479ab14a6ac601a8"
 		},
 		{
 			"ImportPath": "github.com/mattn/go-runewidth",
