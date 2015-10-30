@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+
 SCRIPT=`realpath $0`
 SCRIPT_PATH=`dirname $SCRIPT`
 BUILD_PATH=$SCRIPT_PATH/../build
@@ -15,7 +17,17 @@ then
     exit 1
 fi
 
+set +e
 rm -rf ../build
+set -e
+
+cat <<EOF > $BUILD_PATH/../version.go
+package main
+const VERSION = "$RELEASE_VERSION"
+EOF
+
+git commit $BUILD_PATH/../version.go -m "Release version $RELEASE_VERSION"
+git push origin master
 
 github-release release \
     --user byrnedo \
@@ -26,6 +38,7 @@ github-release release \
     --pre-release
 
 git pull origin
+
 
 $SCRIPT_PATH/create_release_artifacts.sh
 

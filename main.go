@@ -34,6 +34,7 @@ var (
 var logFileFlag = flag.String("log-file", "", "Path to log file")
 var dockerEndpoint = flag.String("docker-endpoint", "unix:/var/run/docker.sock", "Docker connection endpoint")
 var helpFlag = flag.Bool("help", false, "help")
+var versionFlag = flag.Bool("version", false, "print version")
 
 func init() {
 	flag.Usage = func() {
@@ -46,6 +47,10 @@ func init() {
 	if *helpFlag {
 		flag.Usage()
 		os.Exit(1)
+	}
+	if *versionFlag {
+		fmt.Println(VERSION)
+		os.Exit(0)
 	}
 }
 
