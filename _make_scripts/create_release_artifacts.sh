@@ -13,7 +13,7 @@ for linux_arch in 386 amd64
 do
     deb_arch=$linux_arch
     [[ "$deb_arch" = "386" ]] && deb_arch=i386
-    pkg_name=dockdash-${version}-linux$deb_arch
+    pkg_name=dockdash_${version}_$deb_arch
     env GOOS=linux GOARCH=$linux_arch godep go build -o build/releases/${pkg_name}/dockdash
     (cd build/releases/${pkg_name} && zip ../../${pkg_name}.zip  dockdash)
     mkdir -p build/releases/${pkg_name}/usr/local/bin
