@@ -10,6 +10,8 @@ Built in go.
 
 Use arrow keys to jump between data and traverse container list.
 
+'i' key switches to inspect mode, view multiline data for one container.
+
 W.I.P right now, please let me know if there's anything you think I should add to this.
 
 #Getting Started
