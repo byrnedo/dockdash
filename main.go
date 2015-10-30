@@ -174,7 +174,7 @@ func main() {
 	view.InitUIHandlers(uiEventChan)
 
 	ui.Handle("/timer/1s", func(e ui.Event) {
-		//		drawChan <- true
+		drawChan <- true
 	})
 
 	ui.Loop()
