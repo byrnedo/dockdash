@@ -42,7 +42,7 @@ git pull origin
 
 $SCRIPT_PATH/create_release_artifacts.sh
 
-for artifact in $(ls -1 -d $BUILD_PATH/dockdash_$RELEASE_VERSION_*.{zip,deb})
+for artifact in $(ls -1 -d $BUILD_PATH/dockdash_${RELEASE_VERSION}_*.{zip,deb})
 do
     github-release upload \
         --user byrnedo \
