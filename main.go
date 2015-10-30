@@ -89,9 +89,10 @@ func main() {
 
 	uiRoutine := func() {
 		var (
-			horizPosition int = 0
-			offset        int = 0
-			maxOffset     int = 0
+			inspectMode   bool = false
+			horizPosition int  = 0
+			offset        int  = 0
+			maxOffset     int  = 0
 			//lastStatsRender   time.Time = time.Time{}
 			currentContainers = make(map[string]*goDocker.Container)
 		)
@@ -103,6 +104,9 @@ func main() {
 					switch e.Ch {
 					case 'q':
 						doneChan <- true
+					case 'i':
+						inspectMode = !inspectMode
+						uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 					case 0:
 						switch e.Key {
 						case ui.KeyCtrlC, ui.KeyCtrlD:
@@ -111,23 +115,23 @@ func main() {
 							if horizPosition > 0 {
 								horizPosition--
 							}
-							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
+							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 						case ui.KeyArrowRight:
 							if horizPosition < view.MaxHorizPosition {
 								horizPosition++
 							}
-							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
+							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 						case ui.KeyArrowDown:
 							if offset < maxOffset && offset < view.MaxContainers {
 								offset++
 							}
-							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
+							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 							//shift the list down
 						case ui.KeyArrowUp:
 							if offset > 0 {
 								offset--
 							}
-							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
+							uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 							//shift the list up
 						default:
 							Info.Printf("Got unhandled key %d\n", e.Key)
@@ -143,7 +147,7 @@ func main() {
 				Info.Printf("%d, %d, %d", offset, maxOffset, horizPosition)
 				currentContainers[cont.ID] = cont
 				maxOffset = len(currentContainers) - 1
-				uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
+				uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 
 			case removedContainerID := <-removeContainerChan:
 				maxOffset = len(currentContainers) - 1
@@ -154,7 +158,7 @@ func main() {
 				Info.Println("Got dead container event")
 				delete(currentContainers, removedContainerID)
 
-				uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
+				uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 
 			case newStatsCharts := <-drawStatsChan:
 				//				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
