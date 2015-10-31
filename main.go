@@ -10,7 +10,7 @@ import (
 	flag "github.com/ogier/pflag"
 	"io/ioutil"
 	"os"
-	//"time"
+	"time"
 )
 
 type ListData struct {
@@ -98,8 +98,10 @@ func main() {
 			horizPosition int  = 0
 			offset        int  = 0
 			maxOffset     int  = 0
+			currentStats  *docklistener.StatsMsg
 			//lastStatsRender   time.Time = time.Time{}
 			currentContainers = make(map[string]*goDocker.Container)
+			ticker            = time.NewTicker(1 * time.Second)
 		)
 		for {
 			select {
@@ -166,10 +168,17 @@ func main() {
 				uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 
 			case newStatsCharts := <-drawStatsChan:
-				//				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
+				currentStats = newStatsCharts
 				uiView.RenderStats(newStatsCharts, offset)
-				//					lastStatsRender = time.Now()
-				//				}
+
+			case <-ticker.C:
+				var (
+					numCons  = len(currentContainers)
+					totalCpu = sum(currentStats.CpuChart.Data...)
+					totalMem = sum(currentStats.MemChart.Data...)
+				)
+				uiView.InfoBar.Text = fmt.Sprintf(" Cons:%d  Total CPU:%d%%  Total Mem:%d%%", numCons, totalCpu, totalMem)
+				uiView.Render()
 			}
 		}
 	}
@@ -183,4 +192,12 @@ func main() {
 
 	<-doneChan
 
+}
+
+func sum(nums ...int) int {
+	total := 0
+	for _, num := range nums {
+		total += num
+	}
+	return total
 }

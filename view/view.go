@@ -40,6 +40,7 @@ const MaxHorizPosition = int(TimeInfo)
 
 type View struct {
 	Header   *ui.Par
+	InfoBar  *ui.Par
 	CpuChart *ui.BarChart
 	MemChart *ui.BarChart
 	NameList *ui.List
@@ -85,7 +86,12 @@ func NewView() *View {
 	view.Header = ui.NewPar("Containers")
 	view.Header.HasBorder = false
 	view.Header.Text = " Dockdash - Interactive realtime container inspector"
-	view.Header.Height = 3
+	view.Header.Height = 2
+
+	view.InfoBar = ui.NewPar("InfoBar")
+	view.InfoBar.HasBorder = false
+	view.InfoBar.Text = ""
+	view.InfoBar.Height = 2
 
 	view.NameList = createContainerList()
 	view.NameList.Border.Label = "Name"
@@ -111,6 +117,10 @@ func (v *View) SetLayout() {
 	ui.Body.AddRows(
 		ui.NewRow(
 			ui.NewCol(12, 0, v.Header),
+		),
+
+		ui.NewRow(
+			ui.NewCol(12, 0, v.InfoBar),
 		),
 		ui.NewRow(
 			ui.NewCol(12, 0, v.CpuChart),
