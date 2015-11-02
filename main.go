@@ -174,9 +174,14 @@ func main() {
 			case <-ticker.C:
 				var (
 					numCons  = len(currentContainers)
+					totalCpu = 0
+					totalMem = 0
+				)
+				if currentStats != nil {
 					totalCpu = sum(currentStats.CpuChart.Data...)
 					totalMem = sum(currentStats.MemChart.Data...)
-				)
+				}
+
 				uiView.InfoBar.Text = fmt.Sprintf(" Cons:%d  Total CPU:%d%%  Total Mem:%d%%", numCons, totalCpu, totalMem)
 				uiView.Render()
 			}
