@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"time"
+
 	"github.com/byrnedo/dockdash/docklistener"
 	. "github.com/byrnedo/dockdash/logger"
 	view "github.com/byrnedo/dockdash/view"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
 	flag "github.com/ogier/pflag"
-	"io/ioutil"
-	"os"
-	"time"
 )
 
 type ListData struct {
