@@ -20,7 +20,7 @@ W.I.P right now, please let me know if there's anything you think I should add t
 
 Try it out first (requires docker...)
 
-    docker run -it -v /var/run/docker.sock /var/run/docker.sock byrnedo/dockdash
+    docker run -it -v /var/run/docker.sock:/var/run/docker.sock byrnedo/dockdash
 
 This will mount /var/run/docker.sock straight into the container :)
 
