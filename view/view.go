@@ -179,7 +179,7 @@ func (v *View) RenderContainers(containers map[string]*goDocker.Container, infoT
 	v.InfoList.Height = len(info) + 2
 	v.InfoList.Items = info
 	v.InfoList.BorderLabel = InfoHeaders[infoType]
-	//v.Render()
+	v.Render()
 }
 
 func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offset int, infoType DockerInfoType, inspectMode bool) ([]string, []string) {
@@ -371,7 +371,7 @@ func InitUIHandlers(uiEventChan chan<- UIEvent) {
 		uiEventChan <- Resize
 	})
 
-	ui.Handle("/sys/kbd/q", func(ui.Event) {
+	ui.Handle("/sys/kbd/i", func(ui.Event) {
 		uiEventChan <- KeyI
 	})
 
