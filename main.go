@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"time"
+
 	"github.com/byrnedo/dockdash/docklistener"
 	. "github.com/byrnedo/dockdash/logger"
 	view "github.com/byrnedo/dockdash/view"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui"
 	flag "github.com/ogier/pflag"
-	"io/ioutil"
-	"os"
-	//"time"
 )
 
 type ListData struct {
@@ -35,6 +36,7 @@ var (
 var logFileFlag = flag.String("log-file", "", "Path to log file")
 var dockerEndpoint = flag.String("docker-endpoint", "unix:/var/run/docker.sock", "Docker connection endpoint")
 var helpFlag = flag.Bool("help", false, "help")
+var versionFlag = flag.Bool("version", false, "print version")
 
 func init() {
 	flag.Usage = func() {
@@ -47,6 +49,10 @@ func init() {
 	if *helpFlag {
 		flag.Usage()
 		os.Exit(1)
+	}
+	if *versionFlag {
+		fmt.Println(VERSION)
+		os.Exit(0)
 	}
 }
 
@@ -90,11 +96,14 @@ func main() {
 
 	uiRoutine := func() {
 		var (
-			horizPosition int = 0
-			offset        int = 0
-			maxOffset     int = 0
+			inspectMode   bool = false
+			horizPosition int  = 0
+			offset        int  = 0
+			maxOffset     int  = 0
+			currentStats  *docklistener.StatsMsg
 			//lastStatsRender   time.Time = time.Time{}
 			currentContainers = make(map[string]*goDocker.Container)
+			ticker            = time.NewTicker(1 * time.Second)
 		)
 		for {
 			select {
@@ -108,28 +117,27 @@ func main() {
 					if horizPosition > 0 {
 						horizPosition--
 					}
-					uiView.UpdateContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
-					ui.Render(ui.Body)
+					uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 				case view.KeyArrowRight:
 					if horizPosition < view.MaxHorizPosition {
 						horizPosition++
 					}
-					uiView.UpdateContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
-					ui.Render(ui.Body)
+					uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 				case view.KeyArrowDown:
 					if offset < maxOffset && offset < view.MaxContainers {
 						offset++
 					}
-					uiView.UpdateContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
-					ui.Render(ui.Body)
+					uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 					//shift the list down
 				case view.KeyArrowUp:
 					if offset > 0 {
 						offset--
 					}
-					uiView.UpdateContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
-					ui.Render(ui.Body)
+					uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 					//shift the list up
+				case view.KeyI:
+					inspectMode = !inspectMode
+					uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 				default:
 					Info.Printf("Got unhandled key %+v\n", e)
 				}
@@ -138,8 +146,7 @@ func main() {
 				Info.Printf("%d, %d, %d", offset, maxOffset, horizPosition)
 				currentContainers[cont.ID] = &cont
 				maxOffset = len(currentContainers) - 1
-				uiView.UpdateContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
-				ui.Render(ui.Body)
+				uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 
 			case removedContainerID := <-removeContainerChan:
 				maxOffset = len(currentContainers) - 1
@@ -150,8 +157,7 @@ func main() {
 				Info.Println("Got dead container event")
 				delete(currentContainers, removedContainerID)
 
-				uiView.UpdateContainers(currentContainers, view.DockerInfoType(horizPosition), offset)
-				ui.Render(ui.Body)
+				uiView.RenderContainers(currentContainers, view.DockerInfoType(horizPosition), offset, inspectMode)
 
 			case newStatsCharts := <-drawStatsChan:
 				//				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
@@ -160,6 +166,19 @@ func main() {
 				//				}
 			case <-drawChan:
 				ui.Render(ui.Body)
+			case <-ticker.C:
+				var (
+					numCons  = len(currentContainers)
+					totalCpu = 0
+					totalMem = 0
+				)
+				if currentStats != nil {
+					totalCpu = sum(currentStats.CpuChart.Data...)
+					totalMem = sum(currentStats.MemChart.Data...)
+				}
+
+				uiView.InfoBar.Text = fmt.Sprintf(" Cons:%d  Total CPU:%d%%  Total Mem:%d%%", numCons, totalCpu, totalMem)
+				uiView.Render()
 			}
 		}
 	}
@@ -179,4 +198,12 @@ func main() {
 
 	ui.Loop()
 
+}
+
+func sum(nums ...int) int {
+	total := 0
+	for _, num := range nums {
+		total += num
+	}
+	return total
 }
