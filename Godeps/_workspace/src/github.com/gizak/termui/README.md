@@ -48,7 +48,7 @@ Each widget has an underlying block structure which basically is a box model. It
 		g.Width = 50
 		g.Height = 3
 		g.Y = 11
-		g.Border.Label = "Gauge"
+		g.BorderLabel = "Gauge"
 		g.BarColor = ui.ColorRed
 		g.BorderFg = ui.ColorWhite
 		g.BorderLabelFg = ui.ColorCyan
@@ -93,22 +93,22 @@ Grid layout uses [12 columns grid system](http://www.w3schools.com/bootstrap/boo
 
 ```go
 	// handle key q pressing
-	termui.Handle("/sys/kbd/q", func(termui.Event) {
+	ui.Handle("/sys/kbd/q", func(ui.Event) {
 		// press q to quit
-		termui.StopLoop()
+		ui.StopLoop()
 	})
 
-	termui.Handle("/sys/kbd/C-x", func(termui.Event) {
+	ui.Handle("/sys/kbd/C-x", func(ui.Event) {
 		// handle Ctrl + x combination
 	})
 
-	termui.Handle("/sys/kbd", func(termui.Event) {
+	ui.Handle("/sys/kbd", func(ui.Event) {
 		// handle all other key pressing
 	})
 
 	// handle a 1s timer
-	termui.Handle("/timer/1s", func(e ui.Event) {
-		t := e.Data.(termui.EvtTimer)
+	ui.Handle("/timer/1s", func(e ui.Event) {
+		t := e.Data.(ui.EvtTimer)
 		// t is a EvtTimer
 		if t.Count%2 ==0 {
 			// do something

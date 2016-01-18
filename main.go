@@ -34,7 +34,7 @@ var (
 )
 
 var logFileFlag = flag.String("log-file", "", "Path to log file")
-var dockerEndpoint = flag.String("docker-endpoint", "unix:/var/run/docker.sock", "Docker connection endpoint")
+var dockerEndpoint = flag.String("docker-endpoint", "", "Docker connection endpoint")
 var helpFlag = flag.Bool("help", false, "help")
 var versionFlag = flag.Bool("version", false, "print version")
 
@@ -68,7 +68,17 @@ func main() {
 		InitLog(ioutil.Discard, ioutil.Discard, ioutil.Discard, ioutil.Discard)
 	}
 
-	docker, err := goDocker.NewClient(*dockerEndpoint)
+	var (
+		docker *goDocker.Client
+		err    error
+	)
+
+	if len(*dockerEndpoint) > 0 {
+		docker, err = goDocker.NewClient(*dockerEndpoint)
+	} else {
+		docker, err = goDocker.NewClientFromEnv()
+	}
+
 	if err != nil {
 		panic(err)
 	}

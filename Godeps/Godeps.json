@@ -7,20 +7,20 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
-			"Rev": "09604abc82243886001c3f56fd709d4ba603cead"
+			"Rev": "6fb38e6bb3d544d7eb5b55fd396cd4e6850802d8"
 		},
 		{
 			"ImportPath": "github.com/gizak/termui",
-			"Rev": "a302a528a807232d794aabb0479ab14a6ac601a8"
+			"Rev": "551f2e7b8415377bac28e3001882b94fc625aff2"
 		},
 		{
 			"ImportPath": "github.com/mattn/go-runewidth",
-			"Comment": "travisish-37-g12e0ff7",
-			"Rev": "12e0ff74603c9a3209d8bf84f8ab349fe1ad9477"
+			"Comment": "travisish-44-ge882a96",
+			"Rev": "e882a96ec18dd43fa283187b66af74497c9101c0"
 		},
 		{
 			"ImportPath": "github.com/nsf/termbox-go",
-			"Rev": "4f9984b1541648f3a03da24e0f5987fd1c64247d"
+			"Rev": "3a03cc5db65e659df7bed9a5affa72ded8b31f3d"
 		},
 		{
 			"ImportPath": "github.com/ogier/pflag",
