@@ -95,6 +95,9 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 	for {
 		select {
 		case e := <-eventChan:
+			if e == nil {
+				continue
+			}
 			switch e.Status {
 			case "start":
 				Info.Println(e.ID, "started")
