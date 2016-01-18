@@ -11,6 +11,20 @@ import (
 	"time"
 )
 
+type UIEvent int
+
+const (
+	KeyArrowUp UIEvent = 1 << iota
+	KeyArrowDown
+	KeyArrowLeft
+	KeyArrowRight
+	KeyCtrlC
+	KeyCtrlD
+	KeyQ
+	Resize
+	KeyI
+)
+
 type DockerInfoType int
 
 const (
@@ -50,8 +64,8 @@ type View struct {
 func createContainerList() *ui.List {
 	list := ui.NewList()
 	list.ItemFgColor = ui.ColorCyan
-	list.Border.FgColor = ui.ColorBlack
-	list.HasBorder = true
+	list.BorderFg = ui.ColorBlack
+	list.Border = true
 	return list
 }
 
@@ -71,7 +85,7 @@ func (p ContainerSlice) Swap(i, j int) {
 
 func createDockerLineChart() *ui.LineChart {
 	lc := ui.NewLineChart()
-	lc.Border.Label = "Container Numbers"
+	lc.BorderLabel = "Container Numbers"
 	lc.Height = 10
 	lc.AxesColor = ui.ColorWhite
 	lc.LineColor = ui.ColorRed | ui.AttrBold
@@ -84,31 +98,31 @@ func NewView() *View {
 	var view = View{}
 
 	view.Header = ui.NewPar("Containers")
-	view.Header.HasBorder = false
+	view.Header.Border = false
 	view.Header.Text = " Dockdash - Interactive realtime container inspector"
 	view.Header.Height = 2
 
 	view.InfoBar = ui.NewPar("InfoBar")
-	view.InfoBar.HasBorder = false
+	view.InfoBar.Border = false
 	view.InfoBar.Text = ""
 	view.InfoBar.Height = 2
 
 	view.NameList = createContainerList()
-	view.NameList.Border.Label = "Name"
+	view.NameList.BorderLabel = "Name"
 
 	view.InfoList = createContainerList()
-	view.InfoList.Border.Label = "Image"
+	view.InfoList.BorderLabel = "Image"
 
 	view.CpuChart = ui.NewBarChart()
-	view.CpuChart.HasBorder = true
-	view.CpuChart.Border.Label = "%CPU"
-	view.CpuChart.Border.FgColor = ui.ColorBlack
+	view.CpuChart.Border = true
+	view.CpuChart.BorderLabel = "%CPU"
+	view.CpuChart.BorderFg = ui.ColorBlack
 	view.CpuChart.Height = 8
 
 	view.MemChart = ui.NewBarChart()
-	view.MemChart.HasBorder = true
-	view.MemChart.Border.Label = "%MEM"
-	view.MemChart.Border.FgColor = ui.ColorBlack
+	view.MemChart.Border = true
+	view.MemChart.BorderLabel = "%MEM"
+	view.MemChart.BorderFg = ui.ColorBlack
 	view.MemChart.Height = 8
 	return &view
 }
@@ -140,20 +154,23 @@ func (v *View) Align() {
 }
 
 func (v *View) ResetSize() {
-	ui.Body.Width = ui.TermWidth()
-	ui.Body.Align()
+	if ui.TermWidth() > 20 {
+		ui.Body.Width = ui.TermWidth()
+		ui.Body.Align()
+	}
 }
 
 func (v *View) Render() {
+	ui.Clear()
 	ui.Render(ui.Body)
 }
 
-func (v *View) RenderStats(statsCharts *docklistener.StatsMsg, offset int) {
+func (v *View) UpdateStats(statsCharts *docklistener.StatsMsg, offset int) {
 	v.CpuChart.Data = statsCharts.CpuChart.Data[offset:]
 	v.CpuChart.DataLabels = statsCharts.CpuChart.DataLabels[offset:]
 	v.MemChart.Data = statsCharts.MemChart.Data[offset:]
 	v.MemChart.DataLabels = statsCharts.MemChart.DataLabels[offset:]
-	v.Render()
+	//v.Render()
 }
 
 func (v *View) RenderContainers(containers map[string]*goDocker.Container, infoType DockerInfoType, listOffset int, inspectMode bool) {
@@ -162,7 +179,7 @@ func (v *View) RenderContainers(containers map[string]*goDocker.Container, infoT
 	v.NameList.Items = names
 	v.InfoList.Height = len(info) + 2
 	v.InfoList.Items = info
-	v.InfoList.Border.Label = InfoHeaders[infoType]
+	v.InfoList.BorderLabel = InfoHeaders[infoType]
 	v.Render()
 }
 
@@ -316,4 +333,47 @@ func createPortsSlice(ports map[goDocker.Port][]goDocker.PortBinding) (portsSlic
 		i++
 	}
 	return
+}
+
+func InitUIHandlers(uiEventChan chan<- UIEvent) {
+
+	ui.Handle("/sys/kbd", func(e ui.Event) {
+		Info.Printf("%+v\n", e)
+	})
+	ui.Handle("/sys/kbd/q", func(ui.Event) {
+		uiEventChan <- KeyQ
+	})
+
+	ui.Handle("/sys/kbd/C-c", func(ui.Event) {
+		uiEventChan <- KeyCtrlC
+	})
+
+	ui.Handle("/sys/kbd/C-d", func(ui.Event) {
+		uiEventChan <- KeyCtrlD
+	})
+
+	ui.Handle("/sys/kbd/<left>", func(ui.Event) {
+		uiEventChan <- KeyArrowLeft
+	})
+
+	ui.Handle("/sys/kbd/<right>", func(ui.Event) {
+		uiEventChan <- KeyArrowRight
+	})
+
+	ui.Handle("/sys/kbd/<down>", func(ui.Event) {
+		uiEventChan <- KeyArrowDown
+	})
+
+	ui.Handle("/sys/kbd/<up>", func(ui.Event) {
+		uiEventChan <- KeyArrowUp
+	})
+
+	ui.Handle("sys/wnd/resize", func(ui.Event) {
+		uiEventChan <- Resize
+	})
+
+	ui.Handle("/sys/kbd/i", func(ui.Event) {
+		uiEventChan <- KeyI
+	})
+
 }
