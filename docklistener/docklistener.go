@@ -117,7 +117,12 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 					for {
 						select {
 						case stat := <-startsResultInterceptChannels[cont.ID]:
-							statsResultsChan <- StatsResult{*cont, *stat}
+							if cont != nil {
+								if stat == nil {
+									stat = &goDocker.Stats{}
+								}
+								statsResultsChan <- StatsResult{*cont, *stat}
+							}
 						case _ = <-startsResultInterceptDoneChannels[cont.ID]:
 							return
 						}
