@@ -29,6 +29,7 @@ type DockerInfoType int
 
 const (
 	ImageInfo DockerInfoType = iota
+	Names
 	PortInfo
 	BindInfo
 	CommandInfo
@@ -40,6 +41,7 @@ const (
 
 var InfoHeaders map[DockerInfoType]string = map[DockerInfoType]string{
 	ImageInfo:      "Image",
+	Names:          "Names",
 	PortInfo:       "Ports",
 	BindInfo:       "Mounts",
 	CommandInfo:    "Command",
@@ -228,6 +230,8 @@ func createInspectModeData(index int, offset int, infoType DockerInfoType, cont 
 	switch infoType {
 	case ImageInfo:
 		info = []string{cont.Config.Image}
+	case Names:
+		info = []string{cont.Name}
 	case PortInfo:
 		info = createPortsSlice(cont.NetworkSettings.Ports)
 	case BindInfo:
@@ -270,6 +274,11 @@ func createRegularModeData(index int, offset int, infoType DockerInfoType, cont 
 	switch infoType {
 	case ImageInfo:
 		info = cont.Config.Image
+	case Names:
+		info = cont.Name
+		if cont.Node != nil {
+			info = cont.Node.Name + info
+		}
 	case PortInfo:
 		info = createPortsString(cont.NetworkSettings.Ports, ",")
 	case BindInfo:
