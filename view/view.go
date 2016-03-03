@@ -231,7 +231,11 @@ func createInspectModeData(index int, offset int, infoType DockerInfoType, cont 
 	case ImageInfo:
 		info = []string{cont.Config.Image}
 	case Names:
-		info = []string{cont.Name}
+		if cont.Node != nil {
+			info = []string{cont.Node.Name, cont.Name}
+		} else {
+			info = []string{cont.Name}
+		}
 	case PortInfo:
 		info = createPortsSlice(cont.NetworkSettings.Ports)
 	case BindInfo:
