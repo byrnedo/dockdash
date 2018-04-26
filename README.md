@@ -1,4 +1,4 @@
-#Dockdash
+# Dockdash
 
 Realtime docker ps and stats viewer.
 
@@ -16,7 +16,7 @@ Use arrow keys to jump between data and traverse container list.
 
 W.I.P right now, please let me know if there's anything you think I should add to this.
 
-#Getting Started
+# Getting Started
 
 Try it out first (requires docker...)
 
@@ -35,11 +35,11 @@ Otherwise you can build yourself (requires docker):
 Output binary will be in `build/`
     
 
-##Todo
+## Todo
+
 1. Handle multiline info somehow better
 2. Deb package
 3. List Images
 4. List stopped containers
 5. Allow user to perform actions on container ( stop, start )
 
-#PS
