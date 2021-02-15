@@ -43,3 +43,7 @@ Output binary will be in `build/`
 4. List stopped containers
 5. Allow user to perform actions on container ( stop, start )
 
+
+## Alternatives
+
+See [Awesome Docker list](https://github.com/veggiemonk/awesome-docker/blob/master/README.md#terminal) for similar tools to work with Docker.
