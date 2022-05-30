@@ -1,15 +1,19 @@
 package view
 
 import (
-	docklistener "github.com/byrnedo/dockdash/docklistener"
-	. "github.com/byrnedo/dockdash/logger"
-	goDocker "github.com/fsouza/go-dockerclient"
-	ui "github.com/gizak/termui"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	docklistener "github.com/byrnedo/dockdash/docklistener"
+	. "github.com/byrnedo/dockdash/logger"
+	goDocker "github.com/fsouza/go-dockerclient"
+	ui "github.com/gizak/termui/v3"
+	"github.com/gizak/termui/v3/widgets"
 )
+
+var body ui.Drawable
 
 type UIEvent int
 
@@ -55,18 +59,23 @@ const MaxContainers = 1000
 const MaxHorizPosition = int(TimeInfo)
 
 type View struct {
-	Header   *ui.Par
-	InfoBar  *ui.Par
-	CpuChart *ui.BarChart
-	MemChart *ui.BarChart
-	NameList *ui.List
-	InfoList *ui.List
+	Grid     *ui.Grid
+	Header   *widgets.Paragraph
+	InfoBar  *widgets.Paragraph
+	CpuChart *widgets.BarChart
+	MemChart *widgets.BarChart
+	NameList *widgets.List
+	InfoList *widgets.List
 }
 
-func createContainerList() *ui.List {
-	list := ui.NewList()
-	list.ItemFgColor = ui.ColorCyan
-	list.BorderFg = ui.ColorBlack
+func createContainerList() *widgets.List {
+	list := widgets.NewList()
+	//list.SelectedRowStyle = ui.Style{
+	//	Fg: ui.ColorCyan,
+	//}
+	//list.BorderStyle = ui.Style{
+	//	Fg: ui.ColorBlack,
+	//}
 	list.Border = true
 	return list
 }
@@ -85,13 +94,11 @@ func (p ContainerSlice) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
 }
 
-func createDockerLineChart() *ui.LineChart {
-	lc := ui.NewLineChart()
-	lc.BorderLabel = "Container Numbers"
-	lc.Height = 10
+func createDockerLineChart() *widgets.Plot {
+	lc := widgets.NewPlot()
+	lc.Title = "Container Numbers"
 	lc.AxesColor = ui.ColorWhite
-	lc.LineColor = ui.ColorRed | ui.AttrBold
-	lc.Mode = "line"
+	lc.LineColors = append(lc.LineColors, ui.ColorRed)
 	return lc
 }
 
@@ -99,89 +106,110 @@ func NewView() *View {
 
 	var view = View{}
 
-	view.Header = ui.NewPar("Containers")
+	view.Header = widgets.NewParagraph()
 	view.Header.Border = false
 	view.Header.Text = " Dockdash - Interactive realtime container inspector"
-	view.Header.Height = 2
+	//view.Header.Max = 2
 
-	view.InfoBar = ui.NewPar("InfoBar")
+	view.InfoBar = widgets.NewParagraph()
 	view.InfoBar.Border = false
 	view.InfoBar.Text = ""
-	view.InfoBar.Height = 2
+	//view.InfoBar.Height = 2
+	view.InfoBar.SetRect(0, 15, 50, 30)
 
 	view.NameList = createContainerList()
-	view.NameList.BorderLabel = "Name"
+	view.NameList.Title = "Name"
+	view.NameList.SetRect(0, 15, 50, 30)
 
 	view.InfoList = createContainerList()
-	view.InfoList.BorderLabel = "Image"
+	view.InfoList.Title = "Image"
 
-	view.CpuChart = ui.NewBarChart()
+	view.CpuChart = widgets.NewBarChart()
 	view.CpuChart.Border = true
-	view.CpuChart.BorderLabel = "%CPU"
-	view.CpuChart.BorderFg = ui.ColorBlack
-	view.CpuChart.Height = 8
+	view.CpuChart.Title = "%CPU"
+	//view.CpuChart.TitleStyle = ui.Style{Fg: ui.ColorBlack}
 
-	view.MemChart = ui.NewBarChart()
+	view.CpuChart.SetRect(0, 15, 50, 30)
+	//view.CpuChart.Sty = 8
+
+	view.MemChart = widgets.NewBarChart()
 	view.MemChart.Border = true
-	view.MemChart.BorderLabel = "%MEM"
-	view.MemChart.BorderFg = ui.ColorBlack
-	view.MemChart.Height = 8
+	view.MemChart.Title = "%MEM"
+	//view.MemChart.TitleStyle = ui.Style{Fg: ui.ColorBlack}
+	view.MemChart.SetRect(0, 15, 50, 30)
+	//view.MemChart.Height = 8
 	return &view
 }
 
 func (v *View) SetLayout() {
-	ui.Body.AddRows(
-		ui.NewRow(
-			ui.NewCol(12, 0, v.Header),
+	v.Grid = ui.NewGrid()
+	v.ResetSize()
+	v.Grid.Set(
+		ui.NewRow(1.0/8,
+			ui.NewCol(1.0/2, v.Header),
 		),
-
-		ui.NewRow(
-			ui.NewCol(12, 0, v.InfoBar),
+		ui.NewRow(1.0/8,
+			ui.NewCol(1.0/2, v.InfoBar),
 		),
-		ui.NewRow(
-			ui.NewCol(12, 0, v.CpuChart),
+		ui.NewRow(1.0/4,
+			ui.NewCol(1.0, v.CpuChart),
 		),
-		ui.NewRow(
-			ui.NewCol(12, 0, v.MemChart),
+		ui.NewRow(1.0/4,
+			ui.NewCol(1.0, v.MemChart),
 		),
-		ui.NewRow(
-			ui.NewCol(3, 0, v.NameList),
-			ui.NewCol(9, 0, v.InfoList),
+		ui.NewRow(1.0/4,
+			ui.NewCol(1.0/2, v.NameList),
+			ui.NewCol(1.0/2, v.InfoList),
 		),
 	)
 }
 
-func (v *View) Align() {
-	ui.Body.Align()
-}
-
 func (v *View) ResetSize() {
-	if ui.TermWidth() > 20 {
-		ui.Body.Width = ui.TermWidth()
-		ui.Body.Align()
+	termWidth, termHeight := ui.TerminalDimensions()
+	if termWidth > 20 {
+		v.Grid.SetRect(0, 0, termWidth, termHeight)
 	}
 }
 
 func (v *View) Render() {
 	ui.Clear()
-	ui.Render(ui.Body)
+	ui.Render(v.Grid)
 }
 
 func (v *View) UpdateStats(statsCharts *docklistener.StatsMsg, offset int) {
+	Info.Println(statsCharts)
 	v.CpuChart.Data = statsCharts.CpuChart.Data[offset:]
-	v.CpuChart.DataLabels = statsCharts.CpuChart.DataLabels[offset:]
+	numBars := len(v.CpuChart.Data)
+	v.CpuChart.BarColors = make([]ui.Color, numBars)
+	v.CpuChart.LabelStyles = make([]ui.Style, numBars)
+	v.CpuChart.NumStyles = make([]ui.Style, numBars)
+	for i, _ := range v.CpuChart.BarColors {
+		v.CpuChart.BarColors[i] = ui.ColorWhite
+		v.CpuChart.LabelStyles[i] = ui.Style{Fg: ui.ColorWhite}
+		v.CpuChart.NumStyles[i] = ui.Style{Fg: ui.ColorBlack}
+	}
+	v.CpuChart.Labels = statsCharts.CpuChart.DataLabels[offset:]
 	v.MemChart.Data = statsCharts.MemChart.Data[offset:]
-	v.MemChart.DataLabels = statsCharts.MemChart.DataLabels[offset:]
-	//v.Render()
+	numBars = len(v.MemChart.Data)
+	v.MemChart.BarColors = make([]ui.Color, numBars)
+	v.MemChart.LabelStyles = make([]ui.Style, numBars)
+	v.MemChart.NumStyles = make([]ui.Style, numBars)
+	for i, _ := range v.MemChart.BarColors {
+		v.MemChart.BarColors[i] = ui.ColorWhite
+		v.MemChart.LabelStyles[i] = ui.Style{Fg: ui.ColorWhite}
+		v.MemChart.NumStyles[i] = ui.Style{Fg: ui.ColorBlack}
+	}
+	v.MemChart.Labels = statsCharts.MemChart.DataLabels[offset:]
+	v.Render()
 }
 
 func (v *View) RenderContainers(containers map[string]*goDocker.Container, infoType DockerInfoType, listOffset int, inspectMode bool) {
 	names, info := getNameAndInfoOfContainers(containers, listOffset, infoType, inspectMode)
-	v.NameList.Height = len(names) + 2
-	v.NameList.Items = names
-	v.InfoList.Height = len(info) + 2
-	v.InfoList.Items = info
-	v.InfoList.BorderLabel = InfoHeaders[infoType]
+	//v.NameList.Height = len(names) + 2
+	v.NameList.Rows = names
+	//v.InfoList.Height = len(info) + 2
+	v.InfoList.Rows = info
+	v.InfoList.Title = InfoHeaders[infoType]
 	v.Render()
 }
 
@@ -346,47 +374,4 @@ func createPortsSlice(ports map[goDocker.Port][]goDocker.PortBinding) (portsSlic
 		i++
 	}
 	return
-}
-
-func InitUIHandlers(uiEventChan chan<- UIEvent) {
-
-	ui.Handle("/sys/kbd", func(e ui.Event) {
-		Info.Printf("%+v\n", e)
-	})
-	ui.Handle("/sys/kbd/q", func(ui.Event) {
-		uiEventChan <- KeyQ
-	})
-
-	ui.Handle("/sys/kbd/C-c", func(ui.Event) {
-		uiEventChan <- KeyCtrlC
-	})
-
-	ui.Handle("/sys/kbd/C-d", func(ui.Event) {
-		uiEventChan <- KeyCtrlD
-	})
-
-	ui.Handle("/sys/kbd/<left>", func(ui.Event) {
-		uiEventChan <- KeyArrowLeft
-	})
-
-	ui.Handle("/sys/kbd/<right>", func(ui.Event) {
-		uiEventChan <- KeyArrowRight
-	})
-
-	ui.Handle("/sys/kbd/<down>", func(ui.Event) {
-		uiEventChan <- KeyArrowDown
-	})
-
-	ui.Handle("/sys/kbd/<up>", func(ui.Event) {
-		uiEventChan <- KeyArrowUp
-	})
-
-	ui.Handle("sys/wnd/resize", func(ui.Event) {
-		uiEventChan <- Resize
-	})
-
-	ui.Handle("/sys/kbd/i", func(ui.Event) {
-		uiEventChan <- KeyI
-	})
-
 }

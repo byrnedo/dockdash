@@ -10,7 +10,7 @@ import (
 	. "github.com/byrnedo/dockdash/logger"
 	view "github.com/byrnedo/dockdash/view"
 	goDocker "github.com/fsouza/go-dockerclient"
-	ui "github.com/gizak/termui"
+	ui "github.com/gizak/termui/v3"
 	flag "github.com/ogier/pflag"
 )
 
@@ -25,7 +25,6 @@ type ContainersMsg struct {
 }
 
 var (
-	drawChan            chan bool
 	newContainerChan    chan goDocker.Container
 	removeContainerChan chan string
 	doneChan            chan bool
@@ -94,17 +93,18 @@ func main() {
 
 	uiView.SetLayout()
 
-	uiView.Align()
-
 	newContainerChan = make(chan goDocker.Container)
 	removeContainerChan = make(chan string)
 	drawStatsChan = make(chan docklistener.StatsMsg)
 	uiEventChan = make(chan view.UIEvent)
-	drawChan = make(chan bool)
 
 	// Statistics
 
 	uiRoutine := func() {
+
+		drawTicker := time.NewTicker(1 * time.Second)
+		defer drawTicker.Stop()
+
 		var (
 			inspectMode   bool = false
 			horizPosition int  = 0
@@ -122,7 +122,8 @@ func main() {
 				case view.Resize:
 					uiView.ResetSize()
 				case view.KeyQ, view.KeyCtrlC, view.KeyCtrlD:
-					ui.StopLoop()
+					ui.Close()
+					os.Exit(0)
 				case view.KeyArrowLeft:
 					if horizPosition > 0 {
 						horizPosition--
@@ -174,44 +175,62 @@ func main() {
 				uiView.UpdateStats(&newStatsCharts, offset)
 				//					lastStatsRender = time.Now()
 				//				}
-			case <-drawChan:
-				ui.Render(ui.Body)
 			case <-ticker.C:
 				var (
 					numCons  = len(currentContainers)
-					totalCpu = 0
-					totalMem = 0
+					totalCpu = 0.0
+					totalMem = 0.0
 				)
 				if currentStats != nil {
 					totalCpu = sum(currentStats.CpuChart.Data...)
 					totalMem = sum(currentStats.MemChart.Data...)
 				}
 
-				uiView.InfoBar.Text = fmt.Sprintf(" Cons:%d  Total CPU:%d%%  Total Mem:%d%%", numCons, totalCpu, totalMem)
+				uiView.InfoBar.Text = fmt.Sprintf(" Cons:%d  Total CPU:%d%%  Total Mem:%d%%", numCons, int(totalCpu), int(totalMem))
 				uiView.Render()
 			}
 		}
 	}
 
 	//setup initial containers
-	ui.Render(ui.Body)
+	uiView.Render()
 
 	go uiRoutine()
 
 	docklistener.Init(docker, newContainerChan, removeContainerChan, drawStatsChan)
 
-	view.InitUIHandlers(uiEventChan)
-
-	ui.Handle("/timer/1s", func(e ui.Event) {
-		drawChan <- true
-	})
-
-	ui.Loop()
+	uiEvents := ui.PollEvents()
+	for {
+		select {
+		case e := <-uiEvents:
+			Info.Printf("%s - %s\n", e.ID, e.Type)
+			switch e.ID {
+			case "q":
+				uiEventChan <- view.KeyQ
+			case "<C-c>":
+				uiEventChan <- view.KeyCtrlC
+			case "<C-d>":
+				uiEventChan <- view.KeyCtrlD
+			case "<Left>":
+				uiEventChan <- view.KeyArrowLeft
+			case "<Right>":
+				uiEventChan <- view.KeyArrowRight
+			case "<Down>":
+				uiEventChan <- view.KeyArrowDown
+			case "<Up>":
+				uiEventChan <- view.KeyArrowUp
+			case "<Resize>":
+				uiEventChan <- view.Resize
+			case "i":
+				uiEventChan <- view.KeyI
+			}
+		}
+	}
 
 }
 
-func sum(nums ...int) int {
-	total := 0
+func sum(nums ...float64) float64 {
+	total := 0.0
 	for _, num := range nums {
 		total += num
 	}

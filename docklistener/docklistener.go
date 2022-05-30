@@ -1,10 +1,12 @@
 package docklistener
 
 import (
-	. "github.com/byrnedo/dockdash/logger"
-	goDocker "github.com/fsouza/go-dockerclient"
+	"math"
 	"sort"
 	"strconv"
+
+	. "github.com/byrnedo/dockdash/logger"
+	goDocker "github.com/fsouza/go-dockerclient"
 )
 
 type StatsResult struct {
@@ -28,7 +30,7 @@ func (p StatsResultSlice) Swap(i, j int) {
 
 type ChartData struct {
 	DataLabels []string
-	Data       []int
+	Data       []float64
 }
 
 type StatsMsg struct {
@@ -62,11 +64,10 @@ func Init(docker *goDocker.Client, newContChan chan<- goDocker.Container, remove
 	go dockerEventRoutingRoutine(dockerEventChan, newContChan, removeContChan)
 
 	containers, _ := dockerClient.ListContainers(goDocker.ListContainersOptions{})
-	Info.Println("Listing intial", len(containers), "containers as started")
+	Info.Println("Listing initial", len(containers), "containers as started")
 	for _, cont := range containers {
 		Info.Println("Marking", cont.ID, "as started")
 		dockerEventChan <- &goDocker.APIEvents{ID: cont.ID, Status: "start"}
-		//startedContainerChan <- cont.ID
 	}
 
 }
@@ -132,7 +133,7 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 
 				Info.Println("Starting stats routine for", cont.ID)
 				spinOffStatsListener := func() {
-					if err := dockerClient.Stats(goDocker.StatsOptions{cont.ID, startsResultInterceptChannels[cont.ID], true, statsDoneChannels[cont.ID], 0}); err != nil {
+					if err := dockerClient.Stats(goDocker.StatsOptions{ID: cont.ID, Stats: startsResultInterceptChannels[cont.ID], Stream: true, Done: statsDoneChannels[cont.ID]}); err != nil {
 						Error.Println("Error starting statistics handler for id", cont.ID, ":", err.Error())
 						startsResultInterceptDoneChannels[cont.ID] <- true
 					}
@@ -182,10 +183,10 @@ func updateStatsBarCharts(statsList map[string]*StatsResult) (statsCpuChart *Cha
 	)
 
 	statsCpuChart.DataLabels = make([]string, statsListLen)
-	statsCpuChart.Data = make([]int, statsListLen)
+	statsCpuChart.Data = make([]float64, statsListLen)
 
 	statsMemChart.DataLabels = make([]string, statsListLen)
-	statsMemChart.Data = make([]int, statsListLen)
+	statsMemChart.Data = make([]float64, statsListLen)
 
 	count := 0
 	for _, nums := range statsList {
@@ -197,11 +198,11 @@ func updateStatsBarCharts(statsList map[string]*StatsResult) (statsCpuChart *Cha
 
 	for count, stats := range orderedList {
 		statsCpuChart.DataLabels[count] = strconv.Itoa(statsListLen - count)
-		statsCpuChart.Data[count] = int(calculateCPUPercent(&stats.Stats))
+		statsCpuChart.Data[count] = calculateCPUPercent(&stats.Stats)
 
 		statsMemChart.DataLabels[count] = strconv.Itoa(statsListLen - count)
 		if stats.Stats.MemoryStats.Limit != 0 {
-			statsMemChart.Data[count] = int(float64(stats.Stats.MemoryStats.Usage) / float64(stats.Stats.MemoryStats.Limit) * 100)
+			statsMemChart.Data[count] = math.Floor(float64(stats.Stats.MemoryStats.Usage) / float64(stats.Stats.MemoryStats.Limit) * 100)
 		} else {
 			statsMemChart.Data[count] = 0
 		}
