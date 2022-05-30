@@ -6,7 +6,7 @@ GO_IMAGE:=golang:1.5.1
 RELEASE_VERSION:=
 
 build:
-	go get github.com/tools/godep && godep go build -v -o build/dockdash
+	go build -v -o build/dockdash
 
 prepare-release:
 	bash _make_scripts/create_release_artifacts.sh
@@ -18,9 +18,7 @@ d-build:
 	mkdir -p $(ROOT_DIR)/build && \
 	docker run --rm -it\
 		-v "$(ROOT_DIR)":/usr/src/$(REPO_PATH)\
-		-w /usr/src/$(REPO_PATH) $(GO_IMAGE) \
-		go get github.com/tools/godep && \
-		godep go build -v -o build/dockdash
+		-w /usr/src/$(REPO_PATH) $(GO_IMAGE)
 
 try:
 	docker run --rm -it\
