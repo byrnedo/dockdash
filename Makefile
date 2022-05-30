@@ -2,8 +2,8 @@
 
 ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 REPO_PATH:=github.com/byrnedo/dockdash
-GO_IMAGE:=golang:1.5.1
-RELEASE_VERSION:=
+GO_IMAGE:=golang:1.18
+RELEASE_VERSION:=v0.1.1
 
 build:
 	go build -v -o build/dockdash
