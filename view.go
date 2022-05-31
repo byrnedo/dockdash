@@ -45,7 +45,7 @@ const (
 	TimeInfo
 )
 
-var InfoHeaders map[DockerInfoType]string = map[DockerInfoType]string{
+var InfoHeaders = map[DockerInfoType]string{
 	ImageInfo:      "Image",
 	Names:          "Names",
 	PortInfo:       "Ports",
@@ -103,14 +103,6 @@ func (p ContainerSlice) Less(i, j int) bool {
 
 func (p ContainerSlice) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
-}
-
-func createDockerLineChart() *widgets.Plot {
-	lc := widgets.NewPlot()
-	lc.Title = "Container Numbers"
-	lc.AxesColor = ui.ColorWhite
-	lc.LineColors = append(lc.LineColors, ui.ColorRed)
-	return lc
 }
 
 func NewView() *View {
@@ -202,9 +194,7 @@ func (v *View) UpdateStats(statsCharts *StatsMsg, offset int) {
 
 func (v *View) RenderContainers(containers map[string]*goDocker.Container, infoType DockerInfoType, listOffset int, inspectMode bool) {
 	names, info := getNameAndInfoOfContainers(containers, listOffset, infoType, inspectMode)
-	//v.NameList.Height = len(names) + 2
 	v.NameList.Rows = names
-	//v.InfoList.Height = len(info) + 2
 	v.InfoList.Rows = info
 	v.InfoList.Title = InfoHeaders[infoType]
 	v.Render()

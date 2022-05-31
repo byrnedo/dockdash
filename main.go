@@ -114,10 +114,10 @@ func main() {
 func mainLoop(uiView *View, sl *StatsListener) {
 
 	var (
-		inspectMode       bool = false
-		horizPosition     int  = 0
-		offset            int  = 0
-		maxOffset         int  = 0
+		inspectMode       = false
+		horizPosition     = 0
+		offset            = 0
+		maxOffset         = 0
 		currentStats      *StatsMsg
 		currentContainers = make(map[string]*goDocker.Container)
 		ticker            = time.NewTicker(1 * time.Second)
@@ -179,11 +179,10 @@ func mainLoop(uiView *View, sl *StatsListener) {
 			uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset, inspectMode)
 
 		case newStatsCharts := <-drawStatsChan:
-			//				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
+
 			currentStats = &newStatsCharts
 			uiView.UpdateStats(&newStatsCharts, offset)
-			//					lastStatsRender = time.Now()
-			//				}
+
 		case <-ticker.C:
 			var (
 				numCons  = len(currentContainers)
