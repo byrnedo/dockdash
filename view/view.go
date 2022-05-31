@@ -194,7 +194,6 @@ func applyBarChartValues(chart *widgets.BarChart, vals []float64, labels []strin
 }
 
 func (v *View) UpdateStats(statsCharts *docklistener.StatsMsg, offset int) {
-	Info.Println(statsCharts)
 
 	applyBarChartValues(v.CpuChart, statsCharts.CpuChart.Data[offset:], statsCharts.CpuChart.DataLabels[offset:])
 	applyBarChartValues(v.MemChart, statsCharts.MemChart.Data[offset:], statsCharts.MemChart.DataLabels[offset:])

@@ -172,6 +172,7 @@ func main() {
 
 			case newStatsCharts := <-drawStatsChan:
 				//				if time.Now().Sub(lastStatsRender) > 500*time.Millisecond {
+				currentStats = &newStatsCharts
 				uiView.UpdateStats(&newStatsCharts, offset)
 				//					lastStatsRender = time.Now()
 				//				}
