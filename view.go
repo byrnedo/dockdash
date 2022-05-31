@@ -309,7 +309,7 @@ func createRegularModeData(index int, offset int, infoType DockerInfoType, cont 
 			info = cont.Node.Name + info
 		}
 	case PortInfo:
-		info = createPortsString(cont.NetworkSettings.Ports, ",")
+		info = strings.Join(createPortsSlice(cont.NetworkSettings.Ports), ",")
 	case BindInfo:
 		info = strings.TrimRight(strings.Join(cont.HostConfig.Binds, ","), ",")
 	case CommandInfo:
@@ -342,19 +342,6 @@ func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted Container
 	}
 	sort.Sort(sorted)
 	return
-}
-
-func createPortsString(ports map[goDocker.Port][]goDocker.PortBinding, sep string) (portsStr string) {
-
-	for intPort, extHostPortList := range ports {
-		if len(extHostPortList) == 0 {
-			portsStr += intPort.Port() + "->N/A" + sep
-		}
-		for _, extHostPort := range extHostPortList {
-			portsStr += intPort.Port() + "->" + extHostPort.HostIP + ":" + extHostPort.HostPort + sep
-		}
-	}
-	return strings.TrimRight(portsStr, sep)
 }
 
 func createPortsSlice(ports map[goDocker.Port][]goDocker.PortBinding) (portsSlice []string) {
