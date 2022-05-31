@@ -1,6 +1,7 @@
 package view
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,7 +14,9 @@ import (
 	"github.com/gizak/termui/v3/widgets"
 )
 
-var body ui.Drawable
+var (
+	titleStyle = ui.Style{Fg: ui.ColorGreen, Bg: ui.ColorClear}
+)
 
 type UIEvent int
 
@@ -68,8 +71,23 @@ type View struct {
 	InfoList *widgets.List
 }
 
+func createBarChart() *widgets.BarChart {
+
+	chart := widgets.NewBarChart()
+	chart.Border = true
+	chart.NumFormatter = func(f float64) string {
+		return fmt.Sprintf("%02.0f", f)
+	}
+	chart.MaxVal = 100
+	chart.TitleStyle = titleStyle
+	return chart
+}
+
 func createContainerList() *widgets.List {
 	list := widgets.NewList()
+	list.TitleStyle = titleStyle
+	list.TextStyle = ui.Style{Fg: ui.ColorBlue, Bg: ui.ColorClear}
+	list.SelectedRowStyle = ui.Style{Fg: ui.ColorBlue, Bg: ui.ColorClear}
 	//list.SelectedRowStyle = ui.Style{
 	//	Fg: ui.ColorCyan,
 	//}
@@ -108,36 +126,27 @@ func NewView() *View {
 
 	view.Header = widgets.NewParagraph()
 	view.Header.Border = false
-	view.Header.Text = " Dockdash - Interactive realtime container inspector"
+	view.Header.Text = " Dockdash"
+	view.Header.TextStyle = titleStyle
 	//view.Header.Max = 2
 
 	view.InfoBar = widgets.NewParagraph()
 	view.InfoBar.Border = false
 	view.InfoBar.Text = ""
 	//view.InfoBar.Height = 2
-	view.InfoBar.SetRect(0, 15, 50, 30)
 
 	view.NameList = createContainerList()
 	view.NameList.Title = "Name"
-	view.NameList.SetRect(0, 15, 50, 30)
 
 	view.InfoList = createContainerList()
 	view.InfoList.Title = "Image"
 
-	view.CpuChart = widgets.NewBarChart()
-	view.CpuChart.Border = true
+	view.CpuChart = createBarChart()
 	view.CpuChart.Title = "%CPU"
-	//view.CpuChart.TitleStyle = ui.Style{Fg: ui.ColorBlack}
 
-	view.CpuChart.SetRect(0, 15, 50, 30)
-	//view.CpuChart.Sty = 8
-
-	view.MemChart = widgets.NewBarChart()
-	view.MemChart.Border = true
+	view.MemChart = createBarChart()
 	view.MemChart.Title = "%MEM"
-	//view.MemChart.TitleStyle = ui.Style{Fg: ui.ColorBlack}
-	view.MemChart.SetRect(0, 15, 50, 30)
-	//view.MemChart.Height = 8
+
 	return &view
 }
 
@@ -158,8 +167,8 @@ func (v *View) SetLayout() {
 			ui.NewCol(1.0, v.MemChart),
 		),
 		ui.NewRow(1.0/4,
-			ui.NewCol(1.0/2, v.NameList),
-			ui.NewCol(1.0/2, v.InfoList),
+			ui.NewCol(4.0/12, v.NameList),
+			ui.NewCol(8.0/12, v.InfoList),
 		),
 	)
 }
@@ -176,30 +185,26 @@ func (v *View) Render() {
 	ui.Render(v.Grid)
 }
 
+func applyBarChartValues(chart *widgets.BarChart, vals []float64, labels []string) {
+	chart.Data = vals
+	numBars := len(chart.Data)
+	chart.BarColors = make([]ui.Color, numBars)
+	chart.LabelStyles = make([]ui.Style, numBars)
+	chart.NumStyles = make([]ui.Style, numBars)
+	for i, _ := range chart.BarColors {
+		chart.BarColors[i] = ui.ColorWhite
+		chart.LabelStyles[i] = ui.Style{Fg: ui.ColorWhite, Bg: ui.ColorClear}
+		chart.NumStyles[i] = ui.Style{Fg: ui.ColorBlack}
+	}
+	chart.Labels = labels
+}
+
 func (v *View) UpdateStats(statsCharts *docklistener.StatsMsg, offset int) {
 	Info.Println(statsCharts)
-	v.CpuChart.Data = statsCharts.CpuChart.Data[offset:]
-	numBars := len(v.CpuChart.Data)
-	v.CpuChart.BarColors = make([]ui.Color, numBars)
-	v.CpuChart.LabelStyles = make([]ui.Style, numBars)
-	v.CpuChart.NumStyles = make([]ui.Style, numBars)
-	for i, _ := range v.CpuChart.BarColors {
-		v.CpuChart.BarColors[i] = ui.ColorWhite
-		v.CpuChart.LabelStyles[i] = ui.Style{Fg: ui.ColorWhite}
-		v.CpuChart.NumStyles[i] = ui.Style{Fg: ui.ColorBlack}
-	}
-	v.CpuChart.Labels = statsCharts.CpuChart.DataLabels[offset:]
-	v.MemChart.Data = statsCharts.MemChart.Data[offset:]
-	numBars = len(v.MemChart.Data)
-	v.MemChart.BarColors = make([]ui.Color, numBars)
-	v.MemChart.LabelStyles = make([]ui.Style, numBars)
-	v.MemChart.NumStyles = make([]ui.Style, numBars)
-	for i, _ := range v.MemChart.BarColors {
-		v.MemChart.BarColors[i] = ui.ColorWhite
-		v.MemChart.LabelStyles[i] = ui.Style{Fg: ui.ColorWhite}
-		v.MemChart.NumStyles[i] = ui.Style{Fg: ui.ColorBlack}
-	}
-	v.MemChart.Labels = statsCharts.MemChart.DataLabels[offset:]
+
+	applyBarChartValues(v.CpuChart, statsCharts.CpuChart.Data[offset:], statsCharts.CpuChart.DataLabels[offset:])
+	applyBarChartValues(v.MemChart, statsCharts.MemChart.Data[offset:], statsCharts.MemChart.DataLabels[offset:])
+
 	v.Render()
 }
 

@@ -198,11 +198,11 @@ func updateStatsBarCharts(statsList map[string]*StatsResult) (statsCpuChart *Cha
 
 	for count, stats := range orderedList {
 		statsCpuChart.DataLabels[count] = strconv.Itoa(statsListLen - count)
-		statsCpuChart.Data[count] = calculateCPUPercent(&stats.Stats)
+		statsCpuChart.Data[count] = math.Round(calculateCPUPercent(&stats.Stats)*10) / 10
 
 		statsMemChart.DataLabels[count] = strconv.Itoa(statsListLen - count)
 		if stats.Stats.MemoryStats.Limit != 0 {
-			statsMemChart.Data[count] = math.Floor(float64(stats.Stats.MemoryStats.Usage) / float64(stats.Stats.MemoryStats.Limit) * 100)
+			statsMemChart.Data[count] = math.Round((float64(stats.Stats.MemoryStats.Usage)/float64(stats.Stats.MemoryStats.Limit)*100)*10) / 10
 		} else {
 			statsMemChart.Data[count] = 0
 		}
@@ -220,7 +220,7 @@ func calculateCPUPercent(v *goDocker.Stats) float64 {
 	)
 
 	if systemDelta > 0.0 && cpuDelta > 0.0 {
-		cpuPercent = (cpuDelta / systemDelta) * float64(len(v.CPUStats.CPUUsage.PercpuUsage)) * 100.0
+		cpuPercent = (cpuDelta / systemDelta) * float64(v.CPUStats.OnlineCPUs) * 100.0
 	}
 	return cpuPercent
 }
