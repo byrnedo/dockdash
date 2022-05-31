@@ -13,20 +13,9 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
-type ListData struct {
-	Label string
-	Items []string
-}
-
-type ContainersMsg struct {
-	Left  *ListData
-	Right *ListData
-}
-
 var (
 	newContainerChan    chan goDocker.Container
 	removeContainerChan chan string
-	doneChan            chan bool
 	uiEventChan         chan UIEvent
 	drawStatsChan       chan StatsMsg
 )
