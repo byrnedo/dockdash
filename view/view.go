@@ -86,14 +86,8 @@ func createBarChart() *widgets.BarChart {
 func createContainerList() *widgets.List {
 	list := widgets.NewList()
 	list.TitleStyle = titleStyle
-	list.TextStyle = ui.Style{Fg: ui.ColorBlue, Bg: ui.ColorClear}
-	list.SelectedRowStyle = ui.Style{Fg: ui.ColorBlue, Bg: ui.ColorClear}
-	//list.SelectedRowStyle = ui.Style{
-	//	Fg: ui.ColorCyan,
-	//}
-	//list.BorderStyle = ui.Style{
-	//	Fg: ui.ColorBlack,
-	//}
+	list.TextStyle = ui.Style{Fg: ui.ColorCyan, Bg: ui.ColorClear}
+	list.SelectedRowStyle = ui.Style{Fg: ui.ColorCyan, Bg: ui.ColorClear}
 	list.Border = true
 	return list
 }
@@ -160,13 +154,13 @@ func (v *View) SetLayout() {
 		ui.NewRow(1.0/8,
 			ui.NewCol(1.0/2, v.InfoBar),
 		),
-		ui.NewRow(1.0/4,
+		ui.NewRow(1.0/5,
 			ui.NewCol(1.0, v.CpuChart),
 		),
-		ui.NewRow(1.0/4,
+		ui.NewRow(1.0/5,
 			ui.NewCol(1.0, v.MemChart),
 		),
-		ui.NewRow(1.0/4,
+		ui.NewRow(1.0/3,
 			ui.NewCol(4.0/12, v.NameList),
 			ui.NewCol(8.0/12, v.InfoList),
 		),
