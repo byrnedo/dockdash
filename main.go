@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sync"
 	"time"
 
 	. "github.com/byrnedo/dockdash/logger"
@@ -106,19 +107,18 @@ func main() {
 	go handleUiEvents()
 	Info.Println("ui event loop running")
 
-	Info.Println("starting render routine")
-
-	drawTicker := time.NewTicker(1 * time.Second)
-	defer drawTicker.Stop()
+	wg := sync.WaitGroup{}
 
 	go func() {
-		time.Sleep(500 * time.Millisecond)
-		Info.Println("opening stats listener")
-		sl.Open(newContainerChan, removeContainerChan, drawStatsChan)
-		Info.Println("stats listener open")
+		wg.Add(1)
+		mainLoop(uiView, sl)
+		wg.Done()
 	}()
 
-	mainLoop(uiView, sl)
+	Info.Println("opening stats listener")
+	sl.Open(newContainerChan, removeContainerChan, drawStatsChan)
+	Info.Println("stats listener open")
+	wg.Wait()
 
 }
 
