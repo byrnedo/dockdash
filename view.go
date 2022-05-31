@@ -1,4 +1,4 @@
-package view
+package main
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	docklistener "github.com/byrnedo/dockdash/docklistener"
 	. "github.com/byrnedo/dockdash/logger"
 	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui/v3"
@@ -193,7 +192,7 @@ func applyBarChartValues(chart *widgets.BarChart, vals []float64, labels []strin
 	chart.Labels = labels
 }
 
-func (v *View) UpdateStats(statsCharts *docklistener.StatsMsg, offset int) {
+func (v *View) UpdateStats(statsCharts *StatsMsg, offset int) {
 
 	applyBarChartValues(v.CpuChart, statsCharts.CpuChart.Data[offset:], statsCharts.CpuChart.DataLabels[offset:])
 	applyBarChartValues(v.MemChart, statsCharts.MemChart.Data[offset:], statsCharts.MemChart.DataLabels[offset:])

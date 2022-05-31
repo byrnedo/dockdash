@@ -1,6 +1,7 @@
-package docklistener
+package main
 
 import (
+	"context"
 	"math"
 	"sort"
 	"strconv"
@@ -38,47 +39,55 @@ type StatsMsg struct {
 	MemChart *ChartData
 }
 
-var (
-	dockerEventChan chan *goDocker.APIEvents
-	dockerClient    *goDocker.Client
-
+type StatsListener struct {
+	DockerClient         *goDocker.Client
+	ctx                  context.Context
+	cncl                 context.CancelFunc
+	dockerEventChan      chan *goDocker.APIEvents
 	statsResultsChan     chan StatsResult
 	statsResultsDoneChan chan string
-)
+}
 
-func Init(docker *goDocker.Client, newContChan chan<- goDocker.Container, removeContChan chan<- string, drawStatsChan chan<- StatsMsg) {
+func (sl *StatsListener) Open(newContChan chan<- goDocker.Container, removeContChan chan<- string, drawStatsChan chan<- StatsMsg) {
+	sl.ctx, sl.cncl = context.WithCancel(context.Background())
 
-	dockerEventChan = make(chan *goDocker.APIEvents, 10)
-	statsResultsChan = make(chan StatsResult)
-	statsResultsDoneChan = make(chan string)
+	sl.dockerEventChan = make(chan *goDocker.APIEvents, 10)
+	sl.statsResultsChan = make(chan StatsResult)
+	sl.statsResultsDoneChan = make(chan string)
 
-	dockerClient = docker
-
-	err := docker.AddEventListener(dockerEventChan)
+	err := sl.DockerClient.AddEventListener(sl.dockerEventChan)
 	if err != nil {
 		panic("Failed to add event listener: " + err.Error())
 	}
 
-	go statsRenderingRoutine(drawStatsChan)
+	go sl.statsRenderingRoutine(drawStatsChan)
 
-	go dockerEventRoutingRoutine(dockerEventChan, newContChan, removeContChan)
+	go sl.dockerEventRoutingRoutine(newContChan, removeContChan)
 
-	containers, _ := dockerClient.ListContainers(goDocker.ListContainersOptions{})
+	containers, _ := sl.DockerClient.ListContainers(goDocker.ListContainersOptions{})
 	Info.Println("Listing initial", len(containers), "containers as started")
 	for _, cont := range containers {
 		Info.Println("Marking", cont.ID, "as started")
-		dockerEventChan <- &goDocker.APIEvents{ID: cont.ID, Status: "start"}
+		sl.dockerEventChan <- &goDocker.APIEvents{ID: cont.ID, Status: "start"}
 	}
 
+	Info.Println("stats listener open")
 }
 
-func Close() {
-	if err := dockerClient.RemoveEventListener(dockerEventChan); err != nil {
+func (sl *StatsListener) Close() {
+	if sl.cncl == nil {
+		return
+	}
+	if err := sl.DockerClient.RemoveEventListener(sl.dockerEventChan); err != nil {
 		panic(err)
 	}
+	sl.cncl()
+	close(sl.dockerEventChan)
+	close(sl.statsResultsChan)
+	close(sl.statsResultsDoneChan)
 }
 
-func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContainerChan chan<- goDocker.Container, removeContainerChan chan<- string) {
+func (sl *StatsListener) dockerEventRoutingRoutine(newContainerChan chan<- goDocker.Container, removeContainerChan chan<- string) {
 	var (
 		statsDoneChannels                 = make(map[string]chan bool)
 		startsResultInterceptChannels     = make(map[string]chan *goDocker.Stats)
@@ -90,25 +99,27 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 		delete(statsDoneChannels, id)
 		delete(startsResultInterceptChannels, id)
 		delete(startsResultInterceptDoneChannels, id)
-		statsResultsDoneChan <- id
+		sl.statsResultsDoneChan <- id
 	}
 
 	for {
 		select {
-		case e := <-eventChan:
+		case <-sl.ctx.Done():
+			return
+		case e := <-sl.dockerEventChan:
 			if e == nil {
 				continue
 			}
 			switch e.Status {
 			case "start":
 				Info.Println(e.ID, "started")
-				cont, err := dockerClient.InspectContainer(e.ID)
+				cont, err := sl.DockerClient.InspectContainer(e.ID)
 				if err != nil {
 					Error.Println("Failed to inspect new container", e.ID, ":", err)
 					continue
 				}
 				newContainerChan <- *cont
-				statsResultsChan <- StatsResult{*cont, goDocker.Stats{}}
+				sl.statsResultsChan <- StatsResult{*cont, goDocker.Stats{}}
 
 				statsDoneChannels[cont.ID] = make(chan bool, 1)
 				startsResultInterceptChannels[cont.ID] = make(chan *goDocker.Stats)
@@ -117,12 +128,14 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 				spinOffStatsInterceptor := func() {
 					for {
 						select {
+						case <-sl.ctx.Done():
+							return
 						case stat := <-startsResultInterceptChannels[cont.ID]:
 							if cont != nil {
 								if stat == nil {
 									stat = &goDocker.Stats{}
 								}
-								statsResultsChan <- StatsResult{*cont, *stat}
+								sl.statsResultsChan <- StatsResult{*cont, *stat}
 							}
 						case _ = <-startsResultInterceptDoneChannels[cont.ID]:
 							return
@@ -133,7 +146,7 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 
 				Info.Println("Starting stats routine for", cont.ID)
 				spinOffStatsListener := func() {
-					if err := dockerClient.Stats(goDocker.StatsOptions{ID: cont.ID, Stats: startsResultInterceptChannels[cont.ID], Stream: true, Done: statsDoneChannels[cont.ID]}); err != nil {
+					if err := sl.DockerClient.Stats(goDocker.StatsOptions{ID: cont.ID, Stats: startsResultInterceptChannels[cont.ID], Stream: true, Done: statsDoneChannels[cont.ID]}); err != nil {
 						Error.Println("Error starting statistics handler for id", cont.ID, ":", err.Error())
 						startsResultInterceptDoneChannels[cont.ID] <- true
 					}
@@ -142,7 +155,7 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 				go spinOffStatsListener()
 			case "die":
 				removeContainerChan <- e.ID
-				statsResultsDoneChan <- e.ID
+				sl.statsResultsDoneChan <- e.ID
 
 				Info.Println("Stopping stats routine for", e.ID)
 				statsDoneChannels[e.ID] <- true
@@ -153,7 +166,7 @@ func dockerEventRoutingRoutine(eventChan <-chan *goDocker.APIEvents, newContaine
 	}
 }
 
-func statsRenderingRoutine(drawStatsChan chan<- StatsMsg) {
+func (sl *StatsListener) statsRenderingRoutine(drawStatsChan chan<- StatsMsg) {
 
 	var (
 		statsList = make(map[string]*StatsResult)
@@ -161,11 +174,13 @@ func statsRenderingRoutine(drawStatsChan chan<- StatsMsg) {
 
 	for {
 		select {
-		case msg := <-statsResultsChan:
+		case <-sl.ctx.Done():
+			return
+		case msg := <-sl.statsResultsChan:
 			statsList[msg.Container.ID] = &msg
 			statsCpuChart, statsMemChart := updateStatsBarCharts(statsList)
 			drawStatsChan <- StatsMsg{statsCpuChart, statsMemChart}
-		case id := <-statsResultsDoneChan:
+		case id := <-sl.statsResultsDoneChan:
 			delete(statsList, id)
 			statsCpuChart, statsMemChart := updateStatsBarCharts(statsList)
 			drawStatsChan <- StatsMsg{statsCpuChart, statsMemChart}
