@@ -108,17 +108,10 @@ func NewView() *View {
 
 	var view = View{}
 
-	//view.Header = widgets.NewParagraph()
-	//view.Header.Border = false
-	//view.Header.Text = " Dockdash"
-	//view.Header.TextStyle = titleStyle
-	//view.Header.Max = 2
-
 	view.InfoBar = widgets.NewParagraph()
 	view.InfoBar.Border = false
 	view.InfoBar.Text = ""
 	view.InfoBar.TitleStyle = titleStyle
-	//view.InfoBar.Height = 2
 
 	view.NameList = createContainerList()
 	view.NameList.Title = "Name"
@@ -139,9 +132,6 @@ func (v *View) SetLayout() {
 	v.Grid = ui.NewGrid()
 	v.ResetSize()
 	v.Grid.Set(
-		//ui.NewRow(1.0/8,
-		//	ui.NewCol(1.0/2, v.Header),
-		//),
 		ui.NewRow(1.0/12,
 			ui.NewCol(1.0, v.InfoBar),
 		),
@@ -170,25 +160,10 @@ func (v *View) Render() {
 	ui.Render(v.Grid)
 }
 
-func applyBarChartValues(chart *widgets.BarChart, vals []float64, labels []string) {
-	chart.Data = vals
-	numBars := len(chart.Data)
-	chart.BarColors = make([]ui.Color, numBars)
-	chart.LabelStyles = make([]ui.Style, numBars)
-	chart.NumStyles = make([]ui.Style, numBars)
-	chart.Labels = make([]string, numBars)
-	for i, _ := range chart.BarColors {
-		chart.BarColors[i] = ui.ColorWhite
-		chart.LabelStyles[i] = ui.Style{Fg: ui.ColorWhite, Bg: ui.ColorClear}
-		chart.NumStyles[i] = ui.Style{Fg: ui.ColorBlack}
-		chart.Labels[i] = fmt.Sprintf("%3s", labels[i])
-	}
-}
-
 func (v *View) UpdateStats(statsCharts *StatsMsg, offset int) {
 
-	applyBarChartValues(v.CpuChart, statsCharts.CpuChart.Data[offset:], statsCharts.CpuChart.DataLabels[offset:])
-	applyBarChartValues(v.MemChart, statsCharts.MemChart.Data[offset:], statsCharts.MemChart.DataLabels[offset:])
+	statsCharts.CpuChart.UpdateBarChart(v.CpuChart, offset)
+	statsCharts.MemChart.UpdateBarChart(v.MemChart, offset)
 
 	v.Render()
 }

@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sort"
 	"strconv"
 
 	. "github.com/byrnedo/dockdash/logger"
 	goDocker "github.com/fsouza/go-dockerclient"
+	ui "github.com/gizak/termui/v3"
+	"github.com/gizak/termui/v3/widgets"
 )
 
 type StatsResult struct {
@@ -32,6 +35,22 @@ func (p StatsResultSlice) Swap(i, j int) {
 type ChartData struct {
 	DataLabels []string
 	Data       []float64
+}
+
+func (cd ChartData) UpdateBarChart(chart *widgets.BarChart, offset int) {
+	chart.Data = cd.Data[offset:]
+	labels := cd.DataLabels[offset:]
+	numBars := len(chart.Data)
+	chart.BarColors = make([]ui.Color, numBars)
+	chart.LabelStyles = make([]ui.Style, numBars)
+	chart.NumStyles = make([]ui.Style, numBars)
+	chart.Labels = make([]string, numBars)
+	for i, _ := range chart.BarColors {
+		chart.BarColors[i] = ui.ColorWhite
+		chart.LabelStyles[i] = ui.Style{Fg: ui.ColorWhite, Bg: ui.ColorClear}
+		chart.NumStyles[i] = ui.Style{Fg: ui.ColorBlack}
+		chart.Labels[i] = fmt.Sprintf("%3s", labels[i])
+	}
 }
 
 type StatsMsg struct {
