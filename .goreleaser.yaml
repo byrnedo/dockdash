@@ -1,7 +1,5 @@
 # Make sure to check the documentation at http://goreleaser.com
 before:
-  hooks:
-    - make version
 builds:
   - env:
       - CGO_ENABLED=0
