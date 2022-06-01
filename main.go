@@ -16,7 +16,7 @@ import (
 var (
 	newContainerChan    chan goDocker.Container
 	removeContainerChan chan string
-	uiEventChan         chan UIEvent
+	uiEventChan         chan uiEvent
 	drawStatsChan       chan StatsMsg
 )
 
@@ -84,7 +84,7 @@ func main() {
 	newContainerChan = make(chan goDocker.Container)
 	removeContainerChan = make(chan string)
 	drawStatsChan = make(chan StatsMsg)
-	uiEventChan = make(chan UIEvent)
+	uiEventChan = make(chan uiEvent)
 
 	// Statistics
 
@@ -111,7 +111,7 @@ func main() {
 
 }
 
-func mainLoop(uiView *View, sl *StatsListener) {
+func mainLoop(uiView *view, sl *StatsListener) {
 
 	var (
 		inspectMode       = false
@@ -119,7 +119,7 @@ func mainLoop(uiView *View, sl *StatsListener) {
 		offset            = 0
 		maxOffset         = 0
 		currentStats      *StatsMsg
-		currentContainers = make(map[string]*goDocker.Container)
+		currentContainers = make(containerMap)
 		ticker            = time.NewTicker(1 * time.Second)
 	)
 	for {
@@ -136,35 +136,35 @@ func mainLoop(uiView *View, sl *StatsListener) {
 				if horizPosition > 0 {
 					horizPosition--
 				}
-				uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset, inspectMode)
+				uiView.RenderContainers(currentContainers, dockerInfoType(horizPosition), offset, inspectMode)
 			case KeyArrowRight:
-				if horizPosition < MaxHorizPosition {
+				if horizPosition < maxHorizPos {
 					horizPosition++
 				}
-				uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset, inspectMode)
+				uiView.RenderContainers(currentContainers, dockerInfoType(horizPosition), offset, inspectMode)
 			case KeyArrowDown:
-				if offset < maxOffset && offset < MaxContainers {
+				if offset < maxOffset && offset < maxContainers {
 					offset++
 				}
-				uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset, inspectMode)
+				uiView.RenderContainers(currentContainers, dockerInfoType(horizPosition), offset, inspectMode)
 				//shift the list down
 			case KeyArrowUp:
 				if offset > 0 {
 					offset--
 				}
-				uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset, inspectMode)
+				uiView.RenderContainers(currentContainers, dockerInfoType(horizPosition), offset, inspectMode)
 				//shift the list up
 			case KeyI:
 				inspectMode = !inspectMode
-				uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset, inspectMode)
+				uiView.RenderContainers(currentContainers, dockerInfoType(horizPosition), offset, inspectMode)
 			default:
 				Info.Printf("Got unhandled key %+v\n", e)
 			}
 		case cont := <-newContainerChan:
 			Info.Println("Got new containers event")
-			currentContainers[cont.ID] = &cont
+			currentContainers[cont.ID] = container{&cont}
 			maxOffset = len(currentContainers) - 1
-			uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset, inspectMode)
+			uiView.RenderContainers(currentContainers, dockerInfoType(horizPosition), offset, inspectMode)
 
 		case removedContainerID := <-removeContainerChan:
 			maxOffset = len(currentContainers) - 1
@@ -175,7 +175,7 @@ func mainLoop(uiView *View, sl *StatsListener) {
 			Info.Println("Got dead container event")
 			delete(currentContainers, removedContainerID)
 
-			uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset, inspectMode)
+			uiView.RenderContainers(currentContainers, dockerInfoType(horizPosition), offset, inspectMode)
 
 		case newStatsCharts := <-drawStatsChan:
 
@@ -216,12 +216,4 @@ func handleUiEvents() {
 			}
 		}
 	}
-}
-
-func sum(nums ...float64) float64 {
-	total := 0.0
-	for _, num := range nums {
-		total += num
-	}
-	return total
 }

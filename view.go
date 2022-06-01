@@ -2,13 +2,7 @@ package main
 
 import (
 	"fmt"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 
-	. "github.com/byrnedo/dockdash/logger"
-	goDocker "github.com/fsouza/go-dockerclient"
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
 )
@@ -17,10 +11,10 @@ var (
 	titleStyle = ui.Style{Fg: ui.ColorGreen, Bg: ui.ColorClear}
 )
 
-type UIEvent int
+type uiEvent int
 
 const (
-	KeyArrowUp UIEvent = 1 << iota
+	KeyArrowUp uiEvent = 1 << iota
 	KeyArrowDown
 	KeyArrowLeft
 	KeyArrowRight
@@ -31,10 +25,10 @@ const (
 	KeyI
 )
 
-type DockerInfoType int
+type dockerInfoType int
 
 const (
-	ImageInfo DockerInfoType = iota
+	ImageInfo dockerInfoType = iota
 	Names
 	PortInfo
 	BindInfo
@@ -45,7 +39,7 @@ const (
 	TimeInfo
 )
 
-var InfoHeaders = map[DockerInfoType]string{
+var infoHeaders = map[dockerInfoType]string{
 	ImageInfo:      "Image",
 	Names:          "Names",
 	PortInfo:       "Ports",
@@ -57,10 +51,10 @@ var InfoHeaders = map[DockerInfoType]string{
 	TimeInfo:       "Created At",
 }
 
-const MaxContainers = 1000
-const MaxHorizPosition = int(TimeInfo)
+const maxContainers = 1000
+const maxHorizPos = int(TimeInfo)
 
-type View struct {
+type view struct {
 	Grid     *ui.Grid
 	InfoBar  *widgets.Paragraph
 	CpuChart *widgets.BarChart
@@ -90,23 +84,9 @@ func createContainerList() *widgets.List {
 	return list
 }
 
-type ContainerSlice []*goDocker.Container
+func NewView() *view {
 
-func (p ContainerSlice) Len() int {
-	return len(p)
-}
-
-func (p ContainerSlice) Less(i, j int) bool {
-	return p[i].State.StartedAt.After(p[j].State.StartedAt)
-}
-
-func (p ContainerSlice) Swap(i, j int) {
-	p[i], p[j] = p[j], p[i]
-}
-
-func NewView() *View {
-
-	var view = View{}
+	var view = view{}
 
 	view.InfoBar = widgets.NewParagraph()
 	view.InfoBar.Border = false
@@ -128,7 +108,7 @@ func NewView() *View {
 	return &view
 }
 
-func (v *View) SetLayout() {
+func (v *view) SetLayout() {
 	v.Grid = ui.NewGrid()
 	v.ResetSize()
 	v.Grid.Set(
@@ -148,19 +128,19 @@ func (v *View) SetLayout() {
 	)
 }
 
-func (v *View) ResetSize() {
+func (v *view) ResetSize() {
 	termWidth, termHeight := ui.TerminalDimensions()
 	if termWidth > 20 {
 		v.Grid.SetRect(0, 0, termWidth, termHeight)
 	}
 }
 
-func (v *View) Render() {
+func (v *view) Render() {
 	//ui.Clear()
 	ui.Render(v.Grid)
 }
 
-func (v *View) UpdateStats(statsCharts *StatsMsg, offset int) {
+func (v *view) UpdateStats(statsCharts *StatsMsg, offset int) {
 
 	statsCharts.CpuChart.Offset(offset).UpdateBarChart(v.CpuChart)
 	statsCharts.MemChart.Offset(offset).UpdateBarChart(v.MemChart)
@@ -168,165 +148,15 @@ func (v *View) UpdateStats(statsCharts *StatsMsg, offset int) {
 	v.Render()
 }
 
-func (v *View) RenderContainers(containers map[string]*goDocker.Container, infoType DockerInfoType, listOffset int, inspectMode bool) {
-	names, info := getNameAndInfoOfContainers(containers, listOffset, infoType, inspectMode)
+func (v *view) RenderContainers(containers containerMap, infoType dockerInfoType, listOffset int, inspectMode bool) {
+	names, info := containers.getNameAndInfoOfContainers(listOffset, infoType, inspectMode)
 	v.NameList.Rows = names
 	v.InfoList.Rows = info
-	v.InfoList.Title = InfoHeaders[infoType]
+	v.InfoList.Title = infoHeaders[infoType]
 	v.Render()
 }
 
-func getNameAndInfoOfContainers(containers map[string]*goDocker.Container, offset int, infoType DockerInfoType, inspectMode bool) ([]string, []string) {
-	var numContainers = len(containers)
-	if offset > numContainers {
-		offset = numContainers - 1
-	}
-
-	var (
-		info                []string
-		numContainersSubset = numContainers - offset
-		names               = make([]string, numContainersSubset)
-		containersSorted    = mapValuesSorted(containers)
-		nameStr             = ""
-		containerNumber     = 0
-	)
-
-	if !inspectMode {
-		info = make([]string, numContainersSubset)
-	}
-
-	for index, cont := range containersSorted {
-		if index < offset {
-			continue
-		}
-
-		containerNumber = numContainers - index
-		nameStr = strconv.Itoa(containerNumber) + ". " + cont.ID[:12] + " " + strings.TrimLeft(cont.Name, "/")
-
-		if inspectMode && index == offset {
-			names[index-offset] = "*" + nameStr
-			info = createInspectModeData(index, offset, infoType, cont)
-		} else {
-			names[index-offset] = " " + nameStr
-			if !inspectMode {
-				info[index-offset] = createRegularModeData(index, offset, infoType, cont)
-			}
-		}
-
-	}
-	return names, info
-}
-
-func createInspectModeData(index int, offset int, infoType DockerInfoType, cont *goDocker.Container) (info []string) {
-	switch infoType {
-	case ImageInfo:
-		info = []string{cont.Config.Image}
-	case Names:
-		if cont.Node != nil {
-			info = []string{cont.Node.Name, cont.Name}
-		} else {
-			info = []string{cont.Name}
-		}
-	case PortInfo:
-		info = createPortsSlice(cont.NetworkSettings.Ports)
-	case BindInfo:
-		info = make([]string, len(cont.HostConfig.Binds))
-		for i, binding := range cont.HostConfig.Binds {
-			info[i] = binding
-		}
-	case CommandInfo:
-		info = make([]string, len(cont.Args))
-		for i, arg := range cont.Args {
-			info[i] = arg
-		}
-	case EnvInfo:
-		info = make([]string, len(cont.Config.Env))
-		for i, env := range cont.Config.Env {
-			info[i] = env
-		}
-	case EntrypointInfo:
-		info = make([]string, len(cont.Config.Entrypoint))
-		for i, entrypoint := range cont.Config.Entrypoint {
-			info[i] = entrypoint
-		}
-	case VolumesInfo:
-		info = make([]string, len(cont.Volumes))
-		i := 0
-		for intVol, hostVol := range cont.Volumes {
-			info[i] = intVol + ":" + hostVol + ""
-			i++
-		}
-	case TimeInfo:
-		info = []string{cont.State.StartedAt.Format(time.RubyDate)}
-	default:
-		Error.Println("Unhandled info type", infoType)
-	}
-	return
-}
-
-func createRegularModeData(index int, offset int, infoType DockerInfoType, cont *goDocker.Container) (info string) {
-
-	switch infoType {
-	case ImageInfo:
-		info = cont.Config.Image
-	case Names:
-		info = cont.Name
-		if cont.Node != nil {
-			info = cont.Node.Name + info
-		}
-	case PortInfo:
-		info = strings.Join(createPortsSlice(cont.NetworkSettings.Ports), ",")
-	case BindInfo:
-		info = strings.TrimRight(strings.Join(cont.HostConfig.Binds, ","), ",")
-	case CommandInfo:
-		info = cont.Path + " " + strings.Join(cont.Args, " ")
-	case EnvInfo:
-		info = strings.TrimRight(strings.Join(cont.Config.Env, ","), ",")
-	case EntrypointInfo:
-		info = strings.Join(cont.Config.Entrypoint, " ")
-	case VolumesInfo:
-		volStr := ""
-		for intVol, hostVol := range cont.Volumes {
-			volStr += intVol + ":" + hostVol + ","
-		}
-		info = strings.TrimRight(volStr, ",")
-	case TimeInfo:
-		info = cont.State.StartedAt.Format(time.RubyDate)
-	default:
-		Error.Println("Unhandled info type", infoType)
-	}
-	return
-}
-
-func mapValuesSorted(mapToSort map[string]*goDocker.Container) (sorted ContainerSlice) {
-
-	sorted = make(ContainerSlice, len(mapToSort))
-	var i = 0
-	for _, val := range mapToSort {
-		sorted[i] = val
-		i++
-	}
-	sort.Sort(sorted)
-	return
-}
-
-func createPortsSlice(ports map[goDocker.Port][]goDocker.PortBinding) (portsSlice []string) {
-
-	portsSlice = make([]string, len(ports))
-	i := 0
-	for intPort, extHostPortList := range ports {
-		if len(extHostPortList) == 0 {
-			portsSlice[i] = intPort.Port() + "->N/A"
-		}
-		for _, extHostPort := range extHostPortList {
-			portsSlice[i] = intPort.Port() + "->" + extHostPort.HostIP + ":" + extHostPort.HostPort
-		}
-		i++
-	}
-	return
-}
-
-func (v View) UpdateInfoBar(currentContainers map[string]*goDocker.Container, currentStats *StatsMsg) {
+func (v view) UpdateInfoBar(currentContainers containerMap, currentStats *StatsMsg) {
 	var (
 		numCons  = len(currentContainers)
 		totalCpu = 0.0
@@ -340,4 +170,12 @@ func (v View) UpdateInfoBar(currentContainers map[string]*goDocker.Container, cu
 	v.InfoBar.Text = fmt.Sprintf(" Cons:%d  Total CPU:%d%%  Total Mem:%d%%", numCons, int(totalCpu), int(totalMem))
 	v.InfoBar.Title = "Dockdash"
 	v.Render()
+}
+
+func sum(nums ...float64) float64 {
+	total := 0.0
+	for _, num := range nums {
+		total += num
+	}
+	return total
 }
