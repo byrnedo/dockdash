@@ -156,7 +156,7 @@ func (v *View) ResetSize() {
 }
 
 func (v *View) Render() {
-	ui.Clear()
+	//ui.Clear()
 	ui.Render(v.Grid)
 }
 
