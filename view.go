@@ -162,8 +162,8 @@ func (v *View) Render() {
 
 func (v *View) UpdateStats(statsCharts *StatsMsg, offset int) {
 
-	statsCharts.CpuChart.UpdateBarChart(v.CpuChart, offset)
-	statsCharts.MemChart.UpdateBarChart(v.MemChart, offset)
+	statsCharts.CpuChart.Offset(offset).UpdateBarChart(v.CpuChart)
+	statsCharts.MemChart.Offset(offset).UpdateBarChart(v.MemChart)
 
 	v.Render()
 }

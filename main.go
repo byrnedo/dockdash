@@ -162,7 +162,6 @@ func mainLoop(uiView *View, sl *StatsListener) {
 			}
 		case cont := <-newContainerChan:
 			Info.Println("Got new containers event")
-			Info.Printf("%d, %d, %d", offset, maxOffset, horizPosition)
 			currentContainers[cont.ID] = &cont
 			maxOffset = len(currentContainers) - 1
 			uiView.RenderContainers(currentContainers, DockerInfoType(horizPosition), offset, inspectMode)
@@ -181,7 +180,7 @@ func mainLoop(uiView *View, sl *StatsListener) {
 		case newStatsCharts := <-drawStatsChan:
 
 			currentStats = &newStatsCharts
-			uiView.UpdateStats(&newStatsCharts, offset)
+			uiView.UpdateStats(currentStats, offset)
 
 		case <-ticker.C:
 			uiView.UpdateInfoBar(currentContainers, currentStats)

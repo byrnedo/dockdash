@@ -37,25 +37,31 @@ type ChartData struct {
 	Data       []float64
 }
 
-func (cd ChartData) UpdateBarChart(chart *widgets.BarChart, offset int) {
-	chart.Data = cd.Data[offset:]
-	labels := cd.DataLabels[offset:]
-	numBars := len(chart.Data)
-	chart.BarColors = make([]ui.Color, numBars)
-	chart.LabelStyles = make([]ui.Style, numBars)
-	chart.NumStyles = make([]ui.Style, numBars)
-	chart.Labels = make([]string, numBars)
-	for i, _ := range chart.BarColors {
-		chart.BarColors[i] = ui.ColorWhite
-		chart.LabelStyles[i] = ui.Style{Fg: ui.ColorWhite, Bg: ui.ColorClear}
-		chart.NumStyles[i] = ui.Style{Fg: ui.ColorBlack}
-		chart.Labels[i] = fmt.Sprintf("%3s", labels[i])
+func (cd ChartData) Offset(offset int) ChartData {
+	cd.Data = cd.Data[offset:]
+	cd.DataLabels = cd.DataLabels[offset:]
+	return cd
+}
+
+func (cd ChartData) UpdateBarChart(uiChart *widgets.BarChart) {
+
+	uiChart.Data = cd.Data
+	numBars := len(cd.Data)
+	uiChart.BarColors = make([]ui.Color, numBars)
+	uiChart.LabelStyles = make([]ui.Style, numBars)
+	uiChart.NumStyles = make([]ui.Style, numBars)
+	uiChart.Labels = make([]string, numBars)
+	for i := 0; i < numBars; i++ {
+		uiChart.BarColors[i] = ui.ColorWhite
+		uiChart.LabelStyles[i] = ui.Style{Fg: ui.ColorWhite, Bg: ui.ColorClear}
+		uiChart.NumStyles[i] = ui.Style{Fg: ui.ColorBlack}
+		uiChart.Labels[i] = fmt.Sprintf("%3s", cd.DataLabels[i])
 	}
 }
 
 type StatsMsg struct {
-	CpuChart *ChartData
-	MemChart *ChartData
+	CpuChart ChartData
+	MemChart ChartData
 }
 
 type StatsListener struct {
@@ -198,11 +204,11 @@ func (sl *StatsListener) statsRenderingRoutine(drawStatsChan chan<- StatsMsg) {
 		case msg := <-sl.statsResultsChan:
 			statsList[msg.Container.ID] = &msg
 			statsCpuChart, statsMemChart := updateStatsBarCharts(statsList)
-			drawStatsChan <- StatsMsg{statsCpuChart, statsMemChart}
+			drawStatsChan <- StatsMsg{*statsCpuChart, *statsMemChart}
 		case id := <-sl.statsResultsDoneChan:
 			delete(statsList, id)
 			statsCpuChart, statsMemChart := updateStatsBarCharts(statsList)
-			drawStatsChan <- StatsMsg{statsCpuChart, statsMemChart}
+			drawStatsChan <- StatsMsg{*statsCpuChart, *statsMemChart}
 		}
 	}
 }
