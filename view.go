@@ -91,6 +91,7 @@ func NewView() *view {
 	view.InfoBar = widgets.NewParagraph()
 	view.InfoBar.Border = false
 	view.InfoBar.Text = ""
+	view.InfoBar.Title = "Dockdash"
 	view.InfoBar.TitleStyle = titleStyle
 
 	view.NameList = createContainerList()
@@ -168,7 +169,6 @@ func (v view) UpdateInfoBar(currentContainers containerMap, currentStats *StatsM
 	}
 
 	v.InfoBar.Text = fmt.Sprintf(" Cons:%d  Total CPU:%d%%  Total Mem:%d%%", numCons, int(totalCpu), int(totalMem))
-	v.InfoBar.Title = "Dockdash"
 	v.Render()
 }
 
