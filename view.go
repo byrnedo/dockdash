@@ -149,7 +149,7 @@ func (v *view) UpdateStats(statsCharts *StatsMsg, offset int) {
 }
 
 func (v *view) RenderContainers(containers containerMap, infoType dockerInfoType, listOffset int, inspectMode bool) {
-	names, info := containers.getNameAndInfoOfContainers(listOffset, infoType, inspectMode)
+	names, info := containers.namesAndInfo(listOffset, infoType, inspectMode)
 	v.NameList.Rows = names
 	v.InfoList.Rows = info
 	v.InfoList.Title = infoHeaders[infoType]

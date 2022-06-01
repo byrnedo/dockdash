@@ -30,17 +30,17 @@ func (cm containerMap) toSlice() containerSlice {
 	return s
 }
 
-func toSlice[U comparable, V any](m map[U]V) (sorted []V) {
-	sorted = make([]V, len(m))
+func toSlice[U comparable, V any](m map[U]V) (sl []V) {
+	sl = make([]V, len(m))
 	var i = 0
 	for _, val := range m {
-		sorted[i] = val
+		sl[i] = val
 		i++
 	}
 	return
 }
 
-func (cm containerMap) getNameAndInfoOfContainers(offset int, infoType dockerInfoType, inspectMode bool) ([]string, []string) {
+func (cm containerMap) namesAndInfo(offset int, infoType dockerInfoType, inspectMode bool) ([]string, []string) {
 	var numContainers = len(cm)
 	if offset > numContainers {
 		offset = numContainers - 1
@@ -69,11 +69,11 @@ func (cm containerMap) getNameAndInfoOfContainers(offset int, infoType dockerInf
 
 		if inspectMode && index == offset {
 			names[index-offset] = "*" + nameStr
-			info = cont.createInspectModeData(index, offset, infoType)
+			info = cont.inspectInfo(index, offset, infoType)
 		} else {
 			names[index-offset] = " " + nameStr
 			if !inspectMode {
-				info[index-offset] = cont.createRegularModeData(index, offset, infoType)
+				info[index-offset] = cont.regularInfo(index, offset, infoType)
 			}
 		}
 
@@ -81,7 +81,7 @@ func (cm containerMap) getNameAndInfoOfContainers(offset int, infoType dockerInf
 	return names, info
 }
 
-func (cont container) createRegularModeData(index int, offset int, infoType dockerInfoType) (info string) {
+func (cont container) regularInfo(index int, offset int, infoType dockerInfoType) (info string) {
 
 	switch infoType {
 	case ImageInfo:
@@ -115,7 +115,7 @@ func (cont container) createRegularModeData(index int, offset int, infoType dock
 	return
 }
 
-func (cont container) createInspectModeData(index int, offset int, infoType dockerInfoType) (info []string) {
+func (cont container) inspectInfo(index int, offset int, infoType dockerInfoType) (info []string) {
 	switch infoType {
 	case ImageInfo:
 		info = []string{cont.Config.Image}
