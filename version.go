@@ -1,2 +1,2 @@
 package main
-VERSION="v0.1.0-21-g330aa35"
+const VERSION="v0.1.0-22-g1f9d01b"

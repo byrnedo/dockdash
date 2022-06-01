@@ -25,5 +25,5 @@ try:
 		go get -d -v && go build -v -o /tmp/dockdash && /tmp/dockdash
 
 version:
-	echo "package main\nVERSION=\"$$(git describe --tags)\"" > version.go
+	echo "package main\nconst VERSION=\"$$(git describe --tags)\"" > version.go
 
