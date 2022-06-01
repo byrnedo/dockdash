@@ -62,7 +62,6 @@ const MaxHorizPosition = int(TimeInfo)
 
 type View struct {
 	Grid     *ui.Grid
-	Header   *widgets.Paragraph
 	InfoBar  *widgets.Paragraph
 	CpuChart *widgets.BarChart
 	MemChart *widgets.BarChart
@@ -77,7 +76,7 @@ func createBarChart() *widgets.BarChart {
 	chart.NumFormatter = func(f float64) string {
 		return fmt.Sprintf("%02.0f", f)
 	}
-	chart.MaxVal = 100
+	//chart.MaxVal = 100
 	chart.TitleStyle = titleStyle
 	return chart
 }
@@ -109,15 +108,16 @@ func NewView() *View {
 
 	var view = View{}
 
-	view.Header = widgets.NewParagraph()
-	view.Header.Border = false
-	view.Header.Text = " Dockdash"
-	view.Header.TextStyle = titleStyle
+	//view.Header = widgets.NewParagraph()
+	//view.Header.Border = false
+	//view.Header.Text = " Dockdash"
+	//view.Header.TextStyle = titleStyle
 	//view.Header.Max = 2
 
 	view.InfoBar = widgets.NewParagraph()
 	view.InfoBar.Border = false
 	view.InfoBar.Text = ""
+	view.InfoBar.TitleStyle = titleStyle
 	//view.InfoBar.Height = 2
 
 	view.NameList = createContainerList()
@@ -139,19 +139,19 @@ func (v *View) SetLayout() {
 	v.Grid = ui.NewGrid()
 	v.ResetSize()
 	v.Grid.Set(
-		ui.NewRow(1.0/8,
-			ui.NewCol(1.0/2, v.Header),
+		//ui.NewRow(1.0/8,
+		//	ui.NewCol(1.0/2, v.Header),
+		//),
+		ui.NewRow(1.0/12,
+			ui.NewCol(1.0, v.InfoBar),
 		),
-		ui.NewRow(1.0/8,
-			ui.NewCol(1.0/2, v.InfoBar),
-		),
-		ui.NewRow(1.0/5,
+		ui.NewRow(3.0/12,
 			ui.NewCol(1.0, v.CpuChart),
 		),
-		ui.NewRow(1.0/5,
+		ui.NewRow(3.0/12,
 			ui.NewCol(1.0, v.MemChart),
 		),
-		ui.NewRow(1.0/3,
+		ui.NewRow(5.0/12,
 			ui.NewCol(4.0/12, v.NameList),
 			ui.NewCol(8.0/12, v.InfoList),
 		),
@@ -176,12 +176,13 @@ func applyBarChartValues(chart *widgets.BarChart, vals []float64, labels []strin
 	chart.BarColors = make([]ui.Color, numBars)
 	chart.LabelStyles = make([]ui.Style, numBars)
 	chart.NumStyles = make([]ui.Style, numBars)
+	chart.Labels = make([]string, numBars)
 	for i, _ := range chart.BarColors {
 		chart.BarColors[i] = ui.ColorWhite
 		chart.LabelStyles[i] = ui.Style{Fg: ui.ColorWhite, Bg: ui.ColorClear}
 		chart.NumStyles[i] = ui.Style{Fg: ui.ColorBlack}
+		chart.Labels[i] = fmt.Sprintf("%3s", labels[i])
 	}
-	chart.Labels = labels
 }
 
 func (v *View) UpdateStats(statsCharts *StatsMsg, offset int) {
@@ -348,4 +349,20 @@ func createPortsSlice(ports map[goDocker.Port][]goDocker.PortBinding) (portsSlic
 		i++
 	}
 	return
+}
+
+func (v View) UpdateInfoBar(currentContainers map[string]*goDocker.Container, currentStats *StatsMsg) {
+	var (
+		numCons  = len(currentContainers)
+		totalCpu = 0.0
+		totalMem = 0.0
+	)
+	if currentStats != nil {
+		totalCpu = sum(currentStats.CpuChart.Data...)
+		totalMem = sum(currentStats.MemChart.Data...)
+	}
+
+	v.InfoBar.Text = fmt.Sprintf(" Cons:%d  Total CPU:%d%%  Total Mem:%d%%", numCons, int(totalCpu), int(totalMem))
+	v.InfoBar.Title = "Dockdash"
+	v.Render()
 }

@@ -184,18 +184,7 @@ func mainLoop(uiView *View, sl *StatsListener) {
 			uiView.UpdateStats(&newStatsCharts, offset)
 
 		case <-ticker.C:
-			var (
-				numCons  = len(currentContainers)
-				totalCpu = 0.0
-				totalMem = 0.0
-			)
-			if currentStats != nil {
-				totalCpu = sum(currentStats.CpuChart.Data...)
-				totalMem = sum(currentStats.MemChart.Data...)
-			}
-
-			uiView.InfoBar.Text = fmt.Sprintf(" Cons:%d  Total CPU:%d%%  Total Mem:%d%%", numCons, int(totalCpu), int(totalMem))
-			uiView.Render()
+			uiView.UpdateInfoBar(currentContainers, currentStats)
 		}
 	}
 }
